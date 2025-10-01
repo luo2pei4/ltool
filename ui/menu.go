@@ -2,7 +2,9 @@ package memu
 
 import (
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/widget"
 	"github.com/luo2pei4/ltool/ui/pages"
+	"github.com/luo2pei4/ltool/ui/pages/node"
 )
 
 var OnChangeFuncs []func()
@@ -15,8 +17,8 @@ type Page struct {
 
 var (
 	Items = map[string]Page{
-		"lustre": {"Lustre", "", pages.NodeScreen},
-		"node":   {"Node", "", pages.NodeScreen},
+		"lustre": {"Lustre", "", firstScreen},
+		"node":   {"Node", "", node.NodeScreen},
 		"lnet":   {"LNet", "", pages.LNetScreen},
 		"fs":     {"Filesystem", "", pages.FilesystemScreen},
 		"mgs":    {"MGS", "", pages.MGSScreen},
@@ -28,3 +30,7 @@ var (
 		"lustre": {"node", "lnet", "fs", "mgs", "mds", "oss"},
 	}
 )
+
+func firstScreen(_ fyne.Window) fyne.CanvasObject {
+	return widget.NewLabel("")
+}

@@ -1,4 +1,4 @@
-package pages
+package node
 
 import (
 	"fyne.io/fyne/v2"
@@ -6,24 +6,24 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-type Record struct {
-	IP       string
-	User     string
-	Password string
-	Checked  bool
+type record struct {
+	ip       string
+	user     string
+	password string
+	checked  bool
 }
 
 func NodeScreen(_ fyne.Window) fyne.CanvasObject {
 	ipEntry := widget.NewEntry()
-	ipEntry.SetPlaceHolder("IP adress")
+	ipEntry.SetPlaceHolder("ip adress")
 
 	userEntry := widget.NewEntry()
-	userEntry.SetPlaceHolder("ssh user name")
+	userEntry.SetPlaceHolder("user name")
 
 	passEntry := widget.NewPasswordEntry()
-	passEntry.SetPlaceHolder("ssh user password")
+	passEntry.SetPlaceHolder("user password")
 
-	records := []Record{}
+	records := []record{}
 
 	// list define
 	list := widget.NewList(
@@ -47,12 +47,12 @@ func NodeScreen(_ fyne.Window) fyne.CanvasObject {
 			passLabel := row.Objects[3].(*widget.Label)
 
 			checkbox.OnChanged = func(checked bool) {
-				records[id].Checked = checked
+				records[id].checked = checked
 			}
-			checkbox.SetChecked(records[id].Checked)
-			ipLabel.SetText(records[id].IP)
-			userLabel.SetText(records[id].User)
-			passLabel.SetText(records[id].Password)
+			checkbox.SetChecked(records[id].checked)
+			ipLabel.SetText(records[id].ip)
+			userLabel.SetText(records[id].user)
+			passLabel.SetText(records[id].password)
 		},
 	)
 
@@ -66,7 +66,7 @@ func NodeScreen(_ fyne.Window) fyne.CanvasObject {
 			return
 		}
 
-		records = append(records, Record{IP: ip, User: user, Password: pass})
+		records = append(records, record{ip: ip, user: user, password: pass})
 		list.Refresh()
 
 		// clean input

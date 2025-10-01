@@ -8,7 +8,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	data "github.com/luo2pei4/ltool/ui/menu"
+	menu "github.com/luo2pei4/ltool/ui"
 )
 
 type forcedVariant struct {
@@ -25,16 +25,16 @@ const preferenceCurrentTutorial = "currentTutorial"
 var topWindow fyne.Window
 
 func main() {
-	a := app.NewWithID("edmund.luo.ltool")
+	a := app.NewWithID("lustre.gui.tool")
 	topWindow = a.NewWindow("ltool")
-	content := container.NewStack()
-	setPage := func(t data.Page) {
-		content.Objects = []fyne.CanvasObject{t.View(topWindow)}
-		content.Refresh()
+	page := container.NewStack()
+	setPage := func(t menu.Page) {
+		page.Objects = []fyne.CanvasObject{t.View(topWindow)}
+		page.Refresh()
 	}
 
-	feature := container.NewBorder(nil, nil, nil, nil, content)
-	split := container.NewHSplit(makeNav(setPage), feature)
+	content := container.NewBorder(nil, nil, nil, nil, page)
+	split := container.NewHSplit(makeNav(setPage), content)
 	split.Offset = 0.25
 	topWindow.SetContent(split)
 
@@ -42,22 +42,22 @@ func main() {
 	topWindow.ShowAndRun()
 }
 
-func makeNav(setPage func(page data.Page)) fyne.CanvasObject {
+func makeNav(setPage func(page menu.Page)) fyne.CanvasObject {
 	a := fyne.CurrentApp()
 
 	tree := &widget.Tree{
 		ChildUIDs: func(uid string) []string {
-			return data.ItemsIndex[uid]
+			return menu.ItemsIndex[uid]
 		},
 		IsBranch: func(uid string) bool {
-			children, ok := data.ItemsIndex[uid]
+			children, ok := menu.ItemsIndex[uid]
 			return ok && len(children) > 0
 		},
 		CreateNode: func(branch bool) fyne.CanvasObject {
 			return widget.NewLabel("Collection Widgets")
 		},
 		UpdateNode: func(uid string, branch bool, obj fyne.CanvasObject) {
-			i, ok := data.Items[uid]
+			i, ok := menu.Items[uid]
 			if !ok {
 				fyne.LogError("Missing tutorial panel: "+uid, nil)
 				return
@@ -65,11 +65,11 @@ func makeNav(setPage func(page data.Page)) fyne.CanvasObject {
 			obj.(*widget.Label).SetText(i.Title)
 		},
 		OnSelected: func(uid string) {
-			if i, ok := data.Items[uid]; ok {
-				for _, f := range data.OnChangeFuncs {
+			if i, ok := menu.Items[uid]; ok {
+				for _, f := range menu.OnChangeFuncs {
 					f()
 				}
-				data.OnChangeFuncs = nil // Loading a page registers a new cleanup.
+				menu.OnChangeFuncs = nil // Loading a page registers a new cleanup.
 				a.Preferences().SetString(preferenceCurrentTutorial, uid)
 				setPage(i)
 			}
