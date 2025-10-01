@@ -1,2 +1,2 @@
 # ltool
-lustre tool
+lustre GUI tool
