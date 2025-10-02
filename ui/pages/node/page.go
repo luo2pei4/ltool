@@ -2,9 +2,11 @@ package node
 
 import (
 	"fmt"
+	"image/color"
 	"sort"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
@@ -16,6 +18,8 @@ type record struct {
 	password string
 	status   string
 	checked  bool
+	newRec   bool
+	changed  bool
 }
 
 func NodeScreen(w fyne.Window) fyne.CanvasObject {
@@ -39,21 +43,27 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 		},
 		func() fyne.CanvasObject {
 			// UI template for each row
+			bg := canvas.NewRectangle(color.Transparent)
 			checkbox := widget.NewCheck("", nil)
 			ipLabel := widget.NewLabel("")
 			userInput := widget.NewEntry()
 			passInput := widget.NewPasswordEntry()
 			passInput.Password = false
 
-			inputArea := container.NewGridWithColumns(3, ipLabel, userInput, passInput)
+			inputArea := container.NewGridWithColumns(3, container.NewStack(bg, ipLabel), userInput, passInput)
 			row := container.NewBorder(nil, nil, checkbox, nil, inputArea)
 			return row
 		},
 		func(id widget.ListItemID, obj fyne.CanvasObject) {
+
 			row := obj.(*fyne.Container)
 			checkbox := row.Objects[1].(*widget.Check)
 			inputArea := row.Objects[0].(*fyne.Container)
-			ipLabel := inputArea.Objects[0].(*widget.Label)
+
+			stack := inputArea.Objects[0].(*fyne.Container)
+			bg := stack.Objects[0].(*canvas.Rectangle)
+			ipLabel := stack.Objects[1].(*widget.Label)
+
 			userInput := inputArea.Objects[1].(*widget.Entry)
 			passInput := inputArea.Objects[2].(*widget.Entry)
 			passInput.Password = false
@@ -71,14 +81,26 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 			// modify user
 			userInput.OnChanged = func(user string) {
 				records[id].user = user
+				records[id].changed = true
+				selectedStatsLabel.SetText(makeSelectedStatsMsg(&records))
 			}
 			userInput.SetText(records[id].user)
 
 			// modify password
 			passInput.OnChanged = func(pass string) {
 				records[id].password = pass
+				records[id].changed = true
+				selectedStatsLabel.SetText(makeSelectedStatsMsg(&records))
 			}
 			passInput.SetText(records[id].password)
+
+			if records[id].newRec {
+				bg.FillColor = color.RGBA{R: 34, G: 177, B: 76, A: 255} // light green
+			} else if records[id].changed {
+				bg.FillColor = color.RGBA{R: 50, G: 130, B: 246, A: 255} // light blue
+			} else {
+				bg.FillColor = color.Transparent
+			}
 		},
 	)
 
