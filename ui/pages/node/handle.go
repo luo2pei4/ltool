@@ -46,7 +46,6 @@ func addNode(records *[]record, ip, user, password string) {
 			user:     user,
 			password: password,
 			status:   "offline",
-			newRec:   true,
 		})
 		return
 	}
@@ -59,7 +58,6 @@ func addNode(records *[]record, ip, user, password string) {
 			user:     user,
 			password: password,
 			status:   "offline",
-			newRec:   true,
 		})
 		return
 	}
@@ -81,7 +79,17 @@ func addNode(records *[]record, ip, user, password string) {
 			user:     user,
 			password: password,
 			status:   "offline",
-			newRec:   true,
 		})
 	}
+}
+
+func makeSelectedStatsMsg(records *[]record) string {
+	total := len(*records)
+	selected := 0
+	for _, rec := range *records {
+		if rec.checked {
+			selected++
+		}
+	}
+	return fmt.Sprintf("Selected: %d, Total: %d", selected, total)
 }
