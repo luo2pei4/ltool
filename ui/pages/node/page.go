@@ -40,7 +40,7 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 		func() fyne.CanvasObject {
 			// UI template for each row
 			checkbox := widget.NewCheck("", nil)
-			ipLabel := widget.NewEntry()
+			ipLabel := widget.NewLabel("")
 			userInput := widget.NewEntry()
 			passInput := widget.NewPasswordEntry()
 			passInput.Password = false
@@ -53,18 +53,31 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 			row := obj.(*fyne.Container)
 			checkbox := row.Objects[1].(*widget.Check)
 			inputArea := row.Objects[0].(*fyne.Container)
-			ipInput := inputArea.Objects[0].(*widget.Entry)
+			ipLabel := inputArea.Objects[0].(*widget.Label)
 			userInput := inputArea.Objects[1].(*widget.Entry)
 			passInput := inputArea.Objects[2].(*widget.Entry)
 			passInput.Password = false
 
+			// check
 			checkbox.OnChanged = func(checked bool) {
 				records[id].checked = checked
 				selectedStatsLabel.SetText(makeSelectedStatsMsg(&records))
 			}
 			checkbox.SetChecked(records[id].checked)
-			ipInput.SetText(records[id].ip)
+
+			// show ip address
+			ipLabel.SetText(records[id].ip)
+
+			// modify user
+			userInput.OnChanged = func(user string) {
+				records[id].user = user
+			}
 			userInput.SetText(records[id].user)
+
+			// modify password
+			passInput.OnChanged = func(pass string) {
+				records[id].password = pass
+			}
 			passInput.SetText(records[id].password)
 		},
 	)
