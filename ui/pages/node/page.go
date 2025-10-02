@@ -12,16 +12,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-type record struct {
-	ip       string
-	user     string
-	password string
-	status   string
-	checked  bool
-	newRec   bool
-	changed  bool
-}
-
 func NodeScreen(w fyne.Window) fyne.CanvasObject {
 	ipEntry := widget.NewEntry()
 	ipEntry.SetPlaceHolder("ip adress")
@@ -33,13 +23,18 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 	passEntry.SetPlaceHolder("user password")
 	passEntry.Password = false
 
-	records := []record{}
-	selectedStatsLabel := widget.NewLabel(makeSelectedStatsMsg(&records))
+	nodes := &nodes{
+		records:  []node{},
+		ipCh:     make(chan string, 100),
+		statusCh: make(chan string, 100),
+	}
+
+	selectedStatsLabel := widget.NewLabel(nodes.makeSelectedStatsMsg())
 
 	// list define
 	list := widget.NewList(
 		func() int {
-			return len(records)
+			return len(nodes.records)
 		},
 		func() fyne.CanvasObject {
 			// UI template for each row
@@ -70,33 +65,33 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 
 			// check
 			checkbox.OnChanged = func(checked bool) {
-				records[id].checked = checked
-				selectedStatsLabel.SetText(makeSelectedStatsMsg(&records))
+				nodes.records[id].checked = checked
+				selectedStatsLabel.SetText(nodes.makeSelectedStatsMsg())
 			}
-			checkbox.SetChecked(records[id].checked)
+			checkbox.SetChecked(nodes.records[id].checked)
 
 			// show ip address
-			ipLabel.SetText(records[id].ip)
+			ipLabel.SetText(nodes.records[id].ip)
 
 			// modify user
 			userInput.OnChanged = func(user string) {
-				records[id].user = user
-				records[id].changed = true
-				selectedStatsLabel.SetText(makeSelectedStatsMsg(&records))
+				nodes.records[id].user = user
+				nodes.records[id].changed = true
+				selectedStatsLabel.SetText(nodes.makeSelectedStatsMsg())
 			}
-			userInput.SetText(records[id].user)
+			userInput.SetText(nodes.records[id].user)
 
 			// modify password
 			passInput.OnChanged = func(pass string) {
-				records[id].password = pass
-				records[id].changed = true
-				selectedStatsLabel.SetText(makeSelectedStatsMsg(&records))
+				nodes.records[id].password = pass
+				nodes.records[id].changed = true
+				selectedStatsLabel.SetText(nodes.makeSelectedStatsMsg())
 			}
-			passInput.SetText(records[id].password)
+			passInput.SetText(nodes.records[id].password)
 
-			if records[id].newRec {
+			if nodes.records[id].newRec {
 				bg.FillColor = color.RGBA{R: 34, G: 177, B: 76, A: 255} // light green
-			} else if records[id].changed {
+			} else if nodes.records[id].changed {
 				bg.FillColor = color.RGBA{R: 50, G: 130, B: 246, A: 255} // light blue
 			} else {
 				bg.FillColor = color.Transparent
@@ -105,26 +100,26 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 	)
 
 	selectAllBtn := widget.NewButton("Select All", func() {
-		for i := range records {
-			records[i].checked = true
+		for i := range nodes.records {
+			nodes.records[i].checked = true
 		}
-		selectedStatsLabel.SetText(makeSelectedStatsMsg(&records))
+		selectedStatsLabel.SetText(nodes.makeSelectedStatsMsg())
 		list.Refresh()
 	})
 	unselectAllBtn := widget.NewButton("Unselect All", func() {
-		for i := range records {
-			records[i].checked = false
+		for i := range nodes.records {
+			nodes.records[i].checked = false
 		}
-		selectedStatsLabel.SetText(makeSelectedStatsMsg(&records))
+		selectedStatsLabel.SetText(nodes.makeSelectedStatsMsg())
 		list.Refresh()
 	})
 	deleteBtn := widget.NewButton("Delete", func() {
-		if len(records) == 0 {
+		if len(nodes.records) == 0 {
 			list.Refresh()
 			return
 		}
 		checkedRec := 0
-		for _, rec := range records {
+		for _, rec := range nodes.records {
 			if rec.checked {
 				checkedRec++
 			}
@@ -138,21 +133,21 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 					if !confirm {
 						return
 					}
-					newRecs := []record{}
-					for _, rec := range records {
+					newRecs := []node{}
+					for _, rec := range nodes.records {
 						if !rec.checked {
 							newRecs = append(newRecs, rec)
 						}
 					}
-					records = newRecs
-					selectedStatsLabel.SetText(makeSelectedStatsMsg(&records))
+					nodes.records = newRecs
+					selectedStatsLabel.SetText(nodes.makeSelectedStatsMsg())
 					list.Refresh()
 				}, w,
 			)
 		}
 	})
 	saveBtn := widget.NewButton("Save", func() {
-		for _, rec := range records {
+		for _, rec := range nodes.records {
 			fmt.Printf("IP: %s, user: %s, password: %s\n", rec.ip, rec.user, rec.password)
 		}
 		list.Refresh()
@@ -191,14 +186,14 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 			return
 		}
 
-		addNode(&records, ip, user, pass)
-		sort.SliceStable(records, func(i, j int) bool {
-			return records[i].ip < records[j].ip
+		nodes.addNode(ip, user, pass)
+		sort.SliceStable(nodes.records, func(i, j int) bool {
+			return nodes.records[i].ip < nodes.records[j].ip
 		})
-		selectedStatsLabel.SetText(makeSelectedStatsMsg(&records))
+		selectedStatsLabel.SetText(nodes.makeSelectedStatsMsg())
 		list.Refresh()
 		// show bottom widgets
-		updateBtnBarVisibility(btnBar, len(records))
+		updateBtnBarVisibility(btnBar, len(nodes.records))
 
 		// set focus on ip entry
 		w.Canvas().Focus(ipEntry)
@@ -216,7 +211,7 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 		nil,    // right
 		list,   // fill content space
 	)
-	updateBtnBarVisibility(btnBar, len(records))
+	updateBtnBarVisibility(btnBar, len(nodes.records))
 	return content
 }
 
