@@ -3,6 +3,7 @@ package node
 import (
 	"errors"
 	"fmt"
+	"net"
 	"regexp"
 	"strconv"
 	"strings"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	"github.com/luo2pei4/ltool/pkg/consts"
-	probing "github.com/prometheus-community/pro-bing"
 )
 
 type node struct {
@@ -162,8 +162,6 @@ func (n *nodes) detectStatus(ipList []string) {
 		return
 	}
 
-	fmt.Println("detect nodes status monitor")
-
 	resultCh := make(chan string, len(ipList))
 	defer close(resultCh)
 
@@ -172,10 +170,9 @@ func (n *nodes) detectStatus(ipList []string) {
 		wg.Add(1)
 		go func(ip string) {
 			defer wg.Done()
-			if err := pingHost(ip, 3); err == nil {
+			if reachable(ip, "22", time.Second*5, 3) {
 				resultCh <- ip + "-online"
 			} else {
-				fmt.Printf("ping %s failed, %v\n", ip, err)
 				resultCh <- ip + "-offline"
 			}
 		}(ip)
@@ -208,18 +205,25 @@ func (n *nodes) detectStatus(ipList []string) {
 	}
 }
 
-func pingHost(host string, count int) error {
-	pinger, err := probing.NewPinger(host)
-	if err != nil {
-		return err
+func reachable(ip, port string, timeout time.Duration, retry int) bool {
+	var (
+		conn net.Conn
+		err  error
+	)
+	for range retry {
+		conn, err = net.DialTimeout("tcp", net.JoinHostPort(ip, port), timeout)
+		if err != nil {
+			time.Sleep(time.Second)
+			continue
+		}
 	}
-	// Interval
-	pinger.Interval = time.Second
-	// time
-	pinger.Timeout = time.Second * 3
-	// package count
-	pinger.Count = count
-	return pinger.Run()
+	if err != nil {
+		return false
+	}
+	if conn != nil {
+		conn.Close()
+	}
+	return true
 }
 
 func Cleanup() {
