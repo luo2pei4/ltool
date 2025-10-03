@@ -3,6 +3,7 @@ package node
 import (
 	"errors"
 	"fmt"
+	"net"
 	"regexp"
 	"strconv"
 	"strings"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	"github.com/luo2pei4/ltool/pkg/consts"
-	probing "github.com/prometheus-community/pro-bing"
 )
 
 type node struct {
@@ -30,9 +30,12 @@ type nodes struct {
 	statusChgCh chan struct{}
 }
 
+var nodePageDoneCh = make(chan struct{}, 1)
+
 func (n *nodes) addNode(ip, user, password string) {
 	arr := strings.Split(ip, "-")
 	if len(arr) == 1 {
+		ipList := make([]string, 0, 1)
 		n.records = append(n.records, node{
 			ip:       ip,
 			user:     user,
@@ -40,12 +43,15 @@ func (n *nodes) addNode(ip, user, password string) {
 			status:   "offline",
 			newRec:   true,
 		})
+		ipList = append(ipList, ip)
+		n.ipsCh <- ipList
 		return
 	}
 	toNodeIP, _ := strconv.Atoi(arr[1])
 	tmp := strings.Split(arr[0], ".")
 	fromNodeIP, _ := strconv.Atoi(tmp[3])
 	if toNodeIP == fromNodeIP {
+		ipList := make([]string, 0, 1)
 		n.records = append(n.records, node{
 			ip:       ip,
 			user:     user,
@@ -53,6 +59,8 @@ func (n *nodes) addNode(ip, user, password string) {
 			status:   "offline",
 			newRec:   true,
 		})
+		ipList = append(ipList, ip)
+		n.ipsCh <- ipList
 		return
 	}
 	tmpMap := make(map[string]struct{})
@@ -62,20 +70,23 @@ func (n *nodes) addNode(ip, user, password string) {
 	if toNodeIP < fromNodeIP {
 		fromNodeIP, toNodeIP = toNodeIP, fromNodeIP
 	}
+	ipList := make([]string, 0, len(tmpMap))
 	for ; fromNodeIP <= toNodeIP; fromNodeIP++ {
 		tmp[3] = strconv.Itoa(fromNodeIP)
-		newIP := strings.Join(tmp, ".")
-		if _, ok := tmpMap[newIP]; ok {
+		ip := strings.Join(tmp, ".")
+		if _, ok := tmpMap[ip]; ok {
 			continue
 		}
 		n.records = append(n.records, node{
-			ip:       strings.Join(tmp, "."),
+			ip:       ip,
 			user:     user,
 			password: password,
 			status:   "offline",
 			newRec:   true,
 		})
+		ipList = append(ipList, ip)
 	}
+	n.ipsCh <- ipList
 }
 
 func (n *nodes) makeSelectedStatsMsg() string {
@@ -125,6 +136,7 @@ func validateIP(ip string) error {
 }
 
 func (n *nodes) startStatusMonitor() {
+	fmt.Println("start nodes status monitor")
 	timer := time.NewTimer(time.Second)
 	var ipList []string
 	for {
@@ -145,19 +157,24 @@ func (n *nodes) startStatusMonitor() {
 }
 
 func (n *nodes) detectStatus(ipList []string) {
-	var wg sync.WaitGroup
+
+	if len(ipList) == 0 {
+		return
+	}
+
 	resultCh := make(chan string, len(ipList))
 	defer close(resultCh)
 
+	var wg sync.WaitGroup
 	for _, ip := range ipList {
 		wg.Add(1)
 		go func(ip string) {
 			defer wg.Done()
-			status := "offline"
-			if err := pingHost(ip, 3); err != nil {
-				status = "online"
+			if reachable(ip, "22", time.Second*5, 3) {
+				resultCh <- ip + "-online"
+			} else {
+				resultCh <- ip + "-offline"
 			}
-			resultCh <- ip + "-" + status
 		}(ip)
 	}
 	wg.Wait()
@@ -188,16 +205,31 @@ func (n *nodes) detectStatus(ipList []string) {
 	}
 }
 
-func pingHost(host string, count int) error {
-	pinger, err := probing.NewPinger(host)
-	if err != nil {
-		return err
+func reachable(ip, port string, timeout time.Duration, retry int) bool {
+	var (
+		conn net.Conn
+		err  error
+	)
+	for range retry {
+		conn, err = net.DialTimeout("tcp", net.JoinHostPort(ip, port), timeout)
+		if err != nil {
+			time.Sleep(time.Second)
+			continue
+		}
 	}
-	// Interval
-	pinger.Interval = time.Second
-	// time
-	pinger.Timeout = time.Second * 3
-	// package count
-	pinger.Count = count
-	return pinger.Run()
+	if err != nil {
+		return false
+	}
+	if conn != nil {
+		conn.Close()
+	}
+	return true
+}
+
+func Cleanup() {
+	if nodePageDoneCh != nil {
+		nodePageDoneCh <- struct{}{}
+		return
+	}
+	fmt.Println("nodePageDoneCh closed")
 }

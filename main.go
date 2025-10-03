@@ -8,7 +8,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	menu "github.com/luo2pei4/ltool/ui"
+	"github.com/luo2pei4/ltool/ui"
 )
 
 type forcedVariant struct {
@@ -28,7 +28,7 @@ func main() {
 	a := app.NewWithID("lustre.gui.tool")
 	topWindow = a.NewWindow("ltool")
 	page := container.NewStack()
-	setPage := func(p menu.Page) {
+	setPage := func(p ui.Page) {
 		page.Objects = []fyne.CanvasObject{p.View(topWindow)}
 		page.Refresh()
 	}
@@ -42,22 +42,22 @@ func main() {
 	topWindow.ShowAndRun()
 }
 
-func makeNav(setPage func(page menu.Page)) fyne.CanvasObject {
+func makeNav(setPage func(page ui.Page)) fyne.CanvasObject {
 	a := fyne.CurrentApp()
 
 	tree := &widget.Tree{
 		ChildUIDs: func(uid string) []string {
-			return menu.ItemsIndex[uid]
+			return ui.MenuItemsIndex[uid]
 		},
 		IsBranch: func(uid string) bool {
-			children, ok := menu.ItemsIndex[uid]
+			children, ok := ui.MenuItemsIndex[uid]
 			return ok && len(children) > 0
 		},
 		CreateNode: func(branch bool) fyne.CanvasObject {
 			return widget.NewLabel("Collection Widgets")
 		},
 		UpdateNode: func(uid string, branch bool, obj fyne.CanvasObject) {
-			i, ok := menu.Items[uid]
+			i, ok := ui.MenuItems[uid]
 			if !ok {
 				fyne.LogError("Missing tutorial panel: "+uid, nil)
 				return
@@ -65,7 +65,13 @@ func makeNav(setPage func(page menu.Page)) fyne.CanvasObject {
 			obj.(*widget.Label).SetText(i.Title)
 		},
 		OnSelected: func(uid string) {
-			if i, ok := menu.Items[uid]; ok {
+			for id, f := range ui.OnChangedFunc {
+				if id == uid {
+					continue
+				}
+				f()
+			}
+			if i, ok := ui.MenuItems[uid]; ok {
 				a.Preferences().SetString(preferenceCurrentPage, uid)
 				setPage(i)
 			}

@@ -30,7 +30,7 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 	}
 
 	// start online/offline status monitor
-	// go ns.startStatusMonitor()
+	go ns.startStatusMonitor()
 
 	selectedStatsLabel := widget.NewLabel(ns.makeSelectedStatsMsg())
 
@@ -47,9 +47,9 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 			userInput := widget.NewEntry()
 			passInput := widget.NewPasswordEntry()
 			passInput.Password = false
-			statusLabel := widget.NewLabel("")
+			statuscc := container.NewCenter(canvas.NewText("", color.Black))
 
-			inputArea := container.NewGridWithColumns(4, container.NewStack(bg, ipLabel), userInput, passInput, statusLabel)
+			inputArea := container.NewGridWithColumns(4, container.NewStack(bg, ipLabel), userInput, passInput, statuscc)
 			row := container.NewBorder(nil, nil, checkbox, nil, inputArea)
 			return row
 		},
@@ -66,7 +66,9 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 			userInput := inputArea.Objects[1].(*widget.Entry)
 			passInput := inputArea.Objects[2].(*widget.Entry)
 			passInput.Password = false
-			statusLabel := inputArea.Objects[3].(*widget.Label)
+
+			statuscc := inputArea.Objects[3].(*fyne.Container)
+			ctext := statuscc.Objects[0].(*canvas.Text)
 
 			// check
 			checkbox.OnChanged = func(checked bool) {
@@ -93,7 +95,13 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 				selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
 			}
 			passInput.SetText(ns.records[id].password)
-			statusLabel.SetText(ns.records[id].status)
+
+			if ns.records[id].status == "online" {
+				ctext.Color = color.RGBA{R: 34, G: 177, B: 76, A: 255}
+			} else {
+				ctext.Color = color.RGBA{R: 235, G: 51, B: 36, A: 255}
+			}
+			ctext.Text = ns.records[id].status
 
 			if ns.records[id].newRec {
 				bg.FillColor = color.RGBA{R: 34, G: 177, B: 76, A: 255} // light green
@@ -105,16 +113,20 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 		},
 	)
 
-	// go func(n *nodes) {
-	// 	for {
-	// 		select {
-	// 		case <-n.statusChgCh:
-	// 			fyne.Do(func() {
-	// 				list.Refresh()
-	// 			})
-	// 		}
-	// 	}
-	// }(ns)
+	go func(n *nodes) {
+		fmt.Println("start node status change receiver.")
+		for {
+			select {
+			case <-n.statusChgCh:
+				fyne.Do(func() {
+					list.Refresh()
+				})
+			case <-nodePageDoneCh:
+				fmt.Println("close node status change receiver.")
+				return
+			}
+		}
+	}(ns)
 
 	selectAllBtn := widget.NewButton("Select All", func() {
 		for i := range ns.records {
