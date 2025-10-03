@@ -1,4 +1,4 @@
-package memu
+package ui
 
 import (
 	"fyne.io/fyne/v2"
@@ -7,8 +7,6 @@ import (
 	"github.com/luo2pei4/ltool/ui/pages/node"
 )
 
-var OnChangeFuncs []func()
-
 type Page struct {
 	Title string
 	Intro string
@@ -16,7 +14,7 @@ type Page struct {
 }
 
 var (
-	Items = map[string]Page{
+	MenuItems = map[string]Page{
 		"lustre": {"Lustre", "", firstScreen},
 		"node":   {"Node", "", node.NodeScreen},
 		"lnet":   {"LNet", "", pages.LNetScreen},
@@ -25,9 +23,12 @@ var (
 		"mds":    {"MDS", "", pages.MDSScreen},
 		"oss":    {"OSS", "", pages.OSSScreen},
 	}
-	ItemsIndex = map[string][]string{
+	MenuItemsIndex = map[string][]string{
 		"":       {"lustre"},
 		"lustre": {"node", "lnet", "fs", "mgs", "mds", "oss"},
+	}
+	OnChangedFunc = map[string]func(){
+		"node": node.Cleanup,
 	}
 )
 
