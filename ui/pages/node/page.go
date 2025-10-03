@@ -30,7 +30,7 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 	}
 
 	// start online/offline status monitor
-	// go ns.startStatusMonitor()
+	go ns.startStatusMonitor()
 
 	selectedStatsLabel := widget.NewLabel(ns.makeSelectedStatsMsg())
 
@@ -105,16 +105,20 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 		},
 	)
 
-	// go func(n *nodes) {
-	// 	for {
-	// 		select {
-	// 		case <-n.statusChgCh:
-	// 			fyne.Do(func() {
-	// 				list.Refresh()
-	// 			})
-	// 		}
-	// 	}
-	// }(ns)
+	go func(n *nodes) {
+		fmt.Println("start node status change receiver.")
+		for {
+			select {
+			case <-n.statusChgCh:
+				fyne.Do(func() {
+					list.Refresh()
+				})
+			case <-nodePageDoneCh:
+				fmt.Println("close node status change receiver.")
+				return
+			}
+		}
+	}(ns)
 
 	selectAllBtn := widget.NewButton("Select All", func() {
 		for i := range ns.records {
