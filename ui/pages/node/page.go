@@ -23,18 +23,21 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 	passEntry.SetPlaceHolder("user password")
 	passEntry.Password = false
 
-	nodes := &nodes{
-		records:  []node{},
-		ipCh:     make(chan string, 100),
-		statusCh: make(chan string, 100),
+	ns := &nodes{
+		records:     []node{},
+		ipsCh:       make(chan []string, 1),
+		statusChgCh: make(chan struct{}, 1),
 	}
 
-	selectedStatsLabel := widget.NewLabel(nodes.makeSelectedStatsMsg())
+	// start online/offline status monitor
+	// go ns.startStatusMonitor()
+
+	selectedStatsLabel := widget.NewLabel(ns.makeSelectedStatsMsg())
 
 	// list define
 	list := widget.NewList(
 		func() int {
-			return len(nodes.records)
+			return len(ns.records)
 		},
 		func() fyne.CanvasObject {
 			// UI template for each row
@@ -44,8 +47,9 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 			userInput := widget.NewEntry()
 			passInput := widget.NewPasswordEntry()
 			passInput.Password = false
+			statusLabel := widget.NewLabel("")
 
-			inputArea := container.NewGridWithColumns(3, container.NewStack(bg, ipLabel), userInput, passInput)
+			inputArea := container.NewGridWithColumns(4, container.NewStack(bg, ipLabel), userInput, passInput, statusLabel)
 			row := container.NewBorder(nil, nil, checkbox, nil, inputArea)
 			return row
 		},
@@ -62,36 +66,38 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 			userInput := inputArea.Objects[1].(*widget.Entry)
 			passInput := inputArea.Objects[2].(*widget.Entry)
 			passInput.Password = false
+			statusLabel := inputArea.Objects[3].(*widget.Label)
 
 			// check
 			checkbox.OnChanged = func(checked bool) {
-				nodes.records[id].checked = checked
-				selectedStatsLabel.SetText(nodes.makeSelectedStatsMsg())
+				ns.records[id].checked = checked
+				selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
 			}
-			checkbox.SetChecked(nodes.records[id].checked)
+			checkbox.SetChecked(ns.records[id].checked)
 
 			// show ip address
-			ipLabel.SetText(nodes.records[id].ip)
+			ipLabel.SetText(ns.records[id].ip)
 
 			// modify user
 			userInput.OnChanged = func(user string) {
-				nodes.records[id].user = user
-				nodes.records[id].changed = true
-				selectedStatsLabel.SetText(nodes.makeSelectedStatsMsg())
+				ns.records[id].user = user
+				ns.records[id].changed = true
+				selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
 			}
-			userInput.SetText(nodes.records[id].user)
+			userInput.SetText(ns.records[id].user)
 
 			// modify password
 			passInput.OnChanged = func(pass string) {
-				nodes.records[id].password = pass
-				nodes.records[id].changed = true
-				selectedStatsLabel.SetText(nodes.makeSelectedStatsMsg())
+				ns.records[id].password = pass
+				ns.records[id].changed = true
+				selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
 			}
-			passInput.SetText(nodes.records[id].password)
+			passInput.SetText(ns.records[id].password)
+			statusLabel.SetText(ns.records[id].status)
 
-			if nodes.records[id].newRec {
+			if ns.records[id].newRec {
 				bg.FillColor = color.RGBA{R: 34, G: 177, B: 76, A: 255} // light green
-			} else if nodes.records[id].changed {
+			} else if ns.records[id].changed {
 				bg.FillColor = color.RGBA{R: 50, G: 130, B: 246, A: 255} // light blue
 			} else {
 				bg.FillColor = color.Transparent
@@ -99,27 +105,38 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 		},
 	)
 
+	// go func(n *nodes) {
+	// 	for {
+	// 		select {
+	// 		case <-n.statusChgCh:
+	// 			fyne.Do(func() {
+	// 				list.Refresh()
+	// 			})
+	// 		}
+	// 	}
+	// }(ns)
+
 	selectAllBtn := widget.NewButton("Select All", func() {
-		for i := range nodes.records {
-			nodes.records[i].checked = true
+		for i := range ns.records {
+			ns.records[i].checked = true
 		}
-		selectedStatsLabel.SetText(nodes.makeSelectedStatsMsg())
+		selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
 		list.Refresh()
 	})
 	unselectAllBtn := widget.NewButton("Unselect All", func() {
-		for i := range nodes.records {
-			nodes.records[i].checked = false
+		for i := range ns.records {
+			ns.records[i].checked = false
 		}
-		selectedStatsLabel.SetText(nodes.makeSelectedStatsMsg())
+		selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
 		list.Refresh()
 	})
 	deleteBtn := widget.NewButton("Delete", func() {
-		if len(nodes.records) == 0 {
+		if len(ns.records) == 0 {
 			list.Refresh()
 			return
 		}
 		checkedRec := 0
-		for _, rec := range nodes.records {
+		for _, rec := range ns.records {
 			if rec.checked {
 				checkedRec++
 			}
@@ -134,20 +151,20 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 						return
 					}
 					newRecs := []node{}
-					for _, rec := range nodes.records {
+					for _, rec := range ns.records {
 						if !rec.checked {
 							newRecs = append(newRecs, rec)
 						}
 					}
-					nodes.records = newRecs
-					selectedStatsLabel.SetText(nodes.makeSelectedStatsMsg())
+					ns.records = newRecs
+					selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
 					list.Refresh()
 				}, w,
 			)
 		}
 	})
 	saveBtn := widget.NewButton("Save", func() {
-		for _, rec := range nodes.records {
+		for _, rec := range ns.records {
 			fmt.Printf("IP: %s, user: %s, password: %s\n", rec.ip, rec.user, rec.password)
 		}
 		list.Refresh()
@@ -186,14 +203,14 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 			return
 		}
 
-		nodes.addNode(ip, user, pass)
-		sort.SliceStable(nodes.records, func(i, j int) bool {
-			return nodes.records[i].ip < nodes.records[j].ip
+		ns.addNode(ip, user, pass)
+		sort.SliceStable(ns.records, func(i, j int) bool {
+			return ns.records[i].ip < ns.records[j].ip
 		})
-		selectedStatsLabel.SetText(nodes.makeSelectedStatsMsg())
+		selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
 		list.Refresh()
 		// show bottom widgets
-		updateBtnBarVisibility(btnBar, len(nodes.records))
+		updateBtnBarVisibility(btnBar, len(ns.records))
 
 		// set focus on ip entry
 		w.Canvas().Focus(ipEntry)
@@ -211,7 +228,7 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 		nil,    // right
 		list,   // fill content space
 	)
-	updateBtnBarVisibility(btnBar, len(nodes.records))
+	updateBtnBarVisibility(btnBar, len(ns.records))
 	return content
 }
 

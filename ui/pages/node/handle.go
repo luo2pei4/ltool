@@ -6,8 +6,11 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/luo2pei4/ltool/pkg/consts"
+	probing "github.com/prometheus-community/pro-bing"
 )
 
 type node struct {
@@ -21,9 +24,10 @@ type node struct {
 }
 
 type nodes struct {
-	records  []node
-	ipCh     chan string
-	statusCh chan string
+	sync.RWMutex
+	records     []node
+	ipsCh       chan []string
+	statusChgCh chan struct{}
 }
 
 func (n *nodes) addNode(ip, user, password string) {
@@ -118,4 +122,82 @@ func validateIP(ip string) error {
 		}
 	}
 	return nil
+}
+
+func (n *nodes) startStatusMonitor() {
+	timer := time.NewTimer(time.Second)
+	var ipList []string
+	for {
+		select {
+		case <-timer.C:
+			n.RLock()
+			ipList = make([]string, 0, len(n.records))
+			for _, rec := range n.records {
+				ipList = append(ipList, rec.ip)
+			}
+			n.RUnlock()
+		case ips := <-n.ipsCh:
+			ipList = ips
+		}
+		n.detectStatus(ipList)
+		timer.Reset(time.Second * 60)
+	}
+}
+
+func (n *nodes) detectStatus(ipList []string) {
+	var wg sync.WaitGroup
+	resultCh := make(chan string, len(ipList))
+	defer close(resultCh)
+
+	for _, ip := range ipList {
+		wg.Add(1)
+		go func(ip string) {
+			defer wg.Done()
+			status := "offline"
+			if err := pingHost(ip, 3); err != nil {
+				status = "online"
+			}
+			resultCh <- ip + "-" + status
+		}(ip)
+	}
+	wg.Wait()
+	cnt := 0
+	statusMap := make(map[string]string, len(ipList))
+	for res := range resultCh {
+		arr := strings.Split(res, "-")
+		statusMap[arr[0]] = arr[1]
+		cnt++
+		if cnt == len(ipList) {
+			break
+		}
+	}
+	n.Lock()
+	defer n.Unlock()
+	changed := false
+	for idx, rec := range n.records {
+		if status, ok := statusMap[rec.ip]; ok {
+			if n.records[idx].status != status {
+				fmt.Printf("status changed, ip: %s, new status: %s\n", rec.ip, status)
+				n.records[idx].status = status
+				changed = true
+			}
+		}
+	}
+	if changed {
+		n.statusChgCh <- struct{}{}
+	}
+}
+
+func pingHost(host string, count int) error {
+	pinger, err := probing.NewPinger(host)
+	if err != nil {
+		return err
+	}
+	// Interval
+	pinger.Interval = time.Second
+	// time
+	pinger.Timeout = time.Second * 3
+	// package count
+	pinger.Count = count
+	return pinger.Run()
 }

@@ -7,8 +7,6 @@ import (
 	"github.com/luo2pei4/ltool/ui/pages/node"
 )
 
-var OnChangeFuncs []func()
-
 type Page struct {
 	Title string
 	Intro string

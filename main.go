@@ -20,7 +20,7 @@ func (f *forcedVariant) Color(name fyne.ThemeColorName, _ fyne.ThemeVariant) col
 	return f.Theme.Color(name, f.variant)
 }
 
-const preferenceCurrentTutorial = "currentTutorial"
+const preferenceCurrentPage = "currentPage"
 
 var topWindow fyne.Window
 
@@ -28,8 +28,8 @@ func main() {
 	a := app.NewWithID("lustre.gui.tool")
 	topWindow = a.NewWindow("ltool")
 	page := container.NewStack()
-	setPage := func(t menu.Page) {
-		page.Objects = []fyne.CanvasObject{t.View(topWindow)}
+	setPage := func(p menu.Page) {
+		page.Objects = []fyne.CanvasObject{p.View(topWindow)}
 		page.Refresh()
 	}
 
@@ -66,11 +66,7 @@ func makeNav(setPage func(page menu.Page)) fyne.CanvasObject {
 		},
 		OnSelected: func(uid string) {
 			if i, ok := menu.Items[uid]; ok {
-				for _, f := range menu.OnChangeFuncs {
-					f()
-				}
-				menu.OnChangeFuncs = nil // Loading a page registers a new cleanup.
-				a.Preferences().SetString(preferenceCurrentTutorial, uid)
+				a.Preferences().SetString(preferenceCurrentPage, uid)
 				setPage(i)
 			}
 		},
