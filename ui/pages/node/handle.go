@@ -11,6 +11,9 @@ import (
 	"time"
 
 	"github.com/luo2pei4/ltool/pkg/consts"
+	"github.com/luo2pei4/ltool/pkg/dblayer"
+	"github.com/luo2pei4/ltool/pkg/dblayer/repo"
+	"gorm.io/gorm"
 )
 
 type node struct {
@@ -105,6 +108,69 @@ func (n *nodes) makeSelectedStatsMsg() string {
 		}
 	}
 	return fmt.Sprintf("total: %d, new: %d, changed: %d, selected: %d", total, newRecs, changed, selected)
+}
+
+func (n *nodes) getRecords(ip string) error {
+
+	repoNodes, err := dblayer.DB.ListNodes(ip)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	if len(n.records) == 0 {
+		n.Lock()
+		defer n.Unlock()
+		for _, repoNode := range repoNodes {
+			n.records = append(n.records, node{
+				ip:       repoNode.IPAddress,
+				user:     repoNode.UserName,
+				password: repoNode.Password,
+				status:   "offline",
+			})
+		}
+		return nil
+	}
+
+	repoNodesMap := make(map[string]repo.Node, len(repoNodes))
+	for _, repoNode := range repoNodes {
+		repoNodesMap[repoNode.IPAddress] = repoNode
+	}
+	for i, nod := range n.records {
+		repoNode, ok := repoNodesMap[nod.ip]
+		if ok {
+			n.records[i].newRec = false
+			n.records[i].user = repoNode.UserName
+			n.records[i].password = repoNode.Password
+			continue
+		}
+		n.records = append(n.records, node{
+			ip:       repoNode.IPAddress,
+			user:     repoNode.UserName,
+			password: repoNode.Password,
+			status:   "offline",
+		})
+	}
+	return nil
+}
+
+func (n *nodes) saveRecords() error {
+	repos := make([]repo.Node, 0, len(n.records))
+	n.Lock()
+	defer n.Unlock()
+	for _, rec := range n.records {
+		if rec.newRec || rec.changed {
+			repos = append(repos, repo.Node{
+				IPAddress:  rec.ip,
+				UserName:   rec.user,
+				Password:   rec.password,
+				CreateTime: time.Now().Local(),
+			})
+		}
+	}
+	return dblayer.DB.AddNodes(repos)
 }
 
 func validateIP(ip string) error {

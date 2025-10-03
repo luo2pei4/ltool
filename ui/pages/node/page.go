@@ -82,17 +82,37 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 
 			// modify user
 			userInput.OnChanged = func(user string) {
+				init := false
+				if ns.records[id].user == user {
+					init = true
+				}
 				ns.records[id].user = user
-				ns.records[id].changed = true
+				if !init {
+					fmt.Println("changed:", user)
+					ns.records[id].changed = true
+				}
 				selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
+				if ns.records[id].changed {
+					ns.statusChgCh <- struct{}{}
+				}
 			}
 			userInput.SetText(ns.records[id].user)
 
 			// modify password
 			passInput.OnChanged = func(pass string) {
+				init := false
+				if ns.records[id].password == pass {
+					init = true
+				}
 				ns.records[id].password = pass
-				ns.records[id].changed = true
+				if !init {
+					fmt.Println("changed:", pass)
+					ns.records[id].changed = true
+				}
 				selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
+				if ns.records[id].changed {
+					ns.statusChgCh <- struct{}{}
+				}
 			}
 			passInput.SetText(ns.records[id].password)
 
@@ -112,6 +132,14 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 			}
 		},
 	)
+
+	if err := ns.getRecords(""); err != nil {
+		dialog.ShowCustom("Warning", "Close",
+			widget.NewLabel(fmt.Sprintf("can not get nodes from db, %v", err)), w)
+	}
+	if len(ns.records) > 0 {
+		list.Refresh()
+	}
 
 	go func(n *nodes) {
 		fmt.Println("start node status change receiver.")
@@ -176,10 +204,9 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 		}
 	})
 	saveBtn := widget.NewButton("Save", func() {
-		for _, rec := range ns.records {
-			fmt.Printf("IP: %s, user: %s, password: %s\n", rec.ip, rec.user, rec.password)
+		if err := ns.saveRecords(); err != nil {
+			dialog.ShowCustom("Error", "Close", widget.NewLabel(err.Error()), w)
 		}
-		list.Refresh()
 	})
 	btnBar := container.NewBorder(
 		nil,

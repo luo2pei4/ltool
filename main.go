@@ -1,13 +1,16 @@
 package main
 
 import (
+	"fmt"
 	"image/color"
+	"os"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/luo2pei4/ltool/pkg/dblayer"
 	"github.com/luo2pei4/ltool/ui"
 )
 
@@ -25,6 +28,13 @@ const preferenceCurrentPage = "currentPage"
 var topWindow fyne.Window
 
 func main() {
+
+	// init database layer
+	if err := dblayer.Init("sqlite", "./ltool.db"); err != nil {
+		fmt.Printf("initialize database instance failed, %v", err)
+		os.Exit(1)
+	}
+
 	a := app.NewWithID("lustre.gui.tool")
 	topWindow = a.NewWindow("ltool")
 	page := container.NewStack()
