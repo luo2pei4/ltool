@@ -45,7 +45,7 @@ func main() {
 
 	content := container.NewBorder(nil, nil, nil, nil, page)
 	split := container.NewHSplit(makeNav(setPage), content)
-	split.Offset = 0.25
+	split.Offset = 0.2
 	topWindow.SetContent(split)
 
 	topWindow.Resize(fyne.NewSize(1024, 768))
