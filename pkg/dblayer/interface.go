@@ -41,8 +41,6 @@ type dblayer interface {
 	FindNode(ip string) (*repo.Node, error)
 	// ListNodes
 	ListNodes(ip string) ([]repo.Node, error)
-	// AddNode
-	AddNode(n *repo.Node) error
 	// AddNodes
 	AddNodes(nodes []repo.Node) error
 	// UpdateNode

@@ -8,4 +8,5 @@ type Node struct {
 	UserName   string    `gorm:"column:user_name"`
 	Password   string    `gorm:"column:password"`
 	CreateTime time.Time `gorm:"column:create_time"`
+	UpdateTime time.Time `gorm:"column:update_time"`
 }

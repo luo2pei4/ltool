@@ -7,7 +7,12 @@ import (
 )
 
 func (s *sqliteLayer) FindNode(ip string) (*repo.Node, error) {
-	return nil, nil
+	var node repo.Node
+	result := s.Table(consts.TableNodes).Where("ip_address = ?", ip).First(&node)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return &node, nil
 }
 
 func (s *sqliteLayer) ListNodes(ip string) ([]repo.Node, error) {
@@ -24,10 +29,6 @@ func (s *sqliteLayer) ListNodes(ip string) ([]repo.Node, error) {
 	return nodes, err
 }
 
-func (s *sqliteLayer) AddNode(n *repo.Node) error {
-	return nil
-}
-
 func (s *sqliteLayer) AddNodes(nodes []repo.Node) error {
 	return s.Table(consts.TableNodes).Transaction(func(tx *gorm.DB) error {
 		for _, node := range nodes {
@@ -40,9 +41,9 @@ func (s *sqliteLayer) AddNodes(nodes []repo.Node) error {
 }
 
 func (s *sqliteLayer) UpdateNode(n *repo.Node) error {
-	return nil
+	return s.Table(consts.TableNodes).Where("ip_address = ?", n.IPAddress).Updates(n).Error
 }
 
 func (s *sqliteLayer) DeleteNode(ip string) error {
-	return nil
+	return s.Table(consts.TableNodes).Delete(&repo.Node{}, "ip_address = ?", ip).Error
 }

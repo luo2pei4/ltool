@@ -142,35 +142,81 @@ func (n *nodes) getRecords(ip string) error {
 		repoNode, ok := repoNodesMap[nod.ip]
 		if ok {
 			n.records[i].newRec = false
+			n.records[i].changed = false
 			n.records[i].user = repoNode.UserName
 			n.records[i].password = repoNode.Password
-			continue
 		}
-		n.records = append(n.records, node{
-			ip:       repoNode.IPAddress,
-			user:     repoNode.UserName,
-			password: repoNode.Password,
-			status:   "offline",
-		})
+	}
+	pageNodesMap := make(map[string]node, len(n.records))
+	for _, nod := range n.records {
+		pageNodesMap[nod.ip] = nod
+	}
+	for _, repoNode := range repoNodes {
+		nod, ok := pageNodesMap[repoNode.IPAddress]
+		if !ok {
+			nod.status = "offline"
+			n.records = append(n.records, nod)
+		}
 	}
 	return nil
 }
 
 func (n *nodes) saveRecords() error {
-	repos := make([]repo.Node, 0, len(n.records))
+	newRepos := make([]repo.Node, 0, len(n.records))
+	updRepos := make([]repo.Node, 0, len(n.records))
 	n.Lock()
 	defer n.Unlock()
 	for _, rec := range n.records {
-		if rec.newRec || rec.changed {
-			repos = append(repos, repo.Node{
+		nowaTime := time.Now().Local()
+		if rec.newRec {
+			newRepos = append(newRepos, repo.Node{
 				IPAddress:  rec.ip,
 				UserName:   rec.user,
 				Password:   rec.password,
-				CreateTime: time.Now().Local(),
+				CreateTime: nowaTime,
+				UpdateTime: nowaTime,
+			})
+			continue
+		}
+		if rec.changed {
+			updRepos = append(updRepos, repo.Node{
+				IPAddress:  rec.ip,
+				UserName:   rec.user,
+				Password:   rec.password,
+				UpdateTime: nowaTime,
 			})
 		}
 	}
-	return dblayer.DB.AddNodes(repos)
+	if len(newRepos) > 0 {
+		if err := dblayer.DB.AddNodes(newRepos); err != nil {
+			return err
+		}
+	}
+	if len(updRepos) > 0 {
+		for _, r := range updRepos {
+			if err := dblayer.DB.UpdateNode(&r); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (n *nodes) deleteRecords() error {
+	newRecs := []node{}
+	for _, rec := range n.records {
+		if rec.checked {
+			if !rec.newRec {
+				if err := dblayer.DB.DeleteNode(rec.ip); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+		newRecs = append(newRecs, rec)
+	}
+	n.records = newRecs
+	return nil
 }
 
 func validateIP(ip string) error {

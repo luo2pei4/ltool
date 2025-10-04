@@ -88,8 +88,9 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 				}
 				ns.records[id].user = user
 				if !init {
-					fmt.Println("changed:", user)
 					ns.records[id].changed = true
+				} else {
+					ns.records[id].changed = false
 				}
 				selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
 				if ns.records[id].changed {
@@ -106,8 +107,9 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 				}
 				ns.records[id].password = pass
 				if !init {
-					fmt.Println("changed:", pass)
 					ns.records[id].changed = true
+				} else {
+					ns.records[id].changed = false
 				}
 				selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
 				if ns.records[id].changed {
@@ -190,15 +192,16 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 					if !confirm {
 						return
 					}
-					newRecs := []node{}
-					for _, rec := range ns.records {
-						if !rec.checked {
-							newRecs = append(newRecs, rec)
-						}
+					if err := ns.deleteRecords(); err != nil {
+						dialog.ShowCustom("Error", "Close", widget.NewLabel(err.Error()), w)
+						return
 					}
-					ns.records = newRecs
+					if err := ns.getRecords(""); err != nil {
+						dialog.ShowCustom("Error", "Close", widget.NewLabel(fmt.Sprintf("reload nodes failed, %v", err)), w)
+						return
+					}
 					selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
-					list.Refresh()
+					ns.statusChgCh <- struct{}{}
 				}, w,
 			)
 		}
@@ -206,7 +209,14 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 	saveBtn := widget.NewButton("Save", func() {
 		if err := ns.saveRecords(); err != nil {
 			dialog.ShowCustom("Error", "Close", widget.NewLabel(err.Error()), w)
+			return
 		}
+		if err := ns.getRecords(""); err != nil {
+			dialog.ShowCustom("Error", "Close", widget.NewLabel(fmt.Sprintf("reload nodes failed, %v", err)), w)
+			return
+		}
+		selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
+		ns.statusChgCh <- struct{}{}
 	})
 	btnBar := container.NewBorder(
 		nil,
