@@ -11,6 +11,9 @@ import (
 	"time"
 
 	"github.com/luo2pei4/ltool/pkg/consts"
+	"github.com/luo2pei4/ltool/pkg/dblayer"
+	"github.com/luo2pei4/ltool/pkg/dblayer/repo"
+	"gorm.io/gorm"
 )
 
 type node struct {
@@ -105,6 +108,115 @@ func (n *nodes) makeSelectedStatsMsg() string {
 		}
 	}
 	return fmt.Sprintf("total: %d, new: %d, changed: %d, selected: %d", total, newRecs, changed, selected)
+}
+
+func (n *nodes) getRecords(ip string) error {
+
+	repoNodes, err := dblayer.DB.ListNodes(ip)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	if len(n.records) == 0 {
+		n.Lock()
+		defer n.Unlock()
+		for _, repoNode := range repoNodes {
+			n.records = append(n.records, node{
+				ip:       repoNode.IPAddress,
+				user:     repoNode.UserName,
+				password: repoNode.Password,
+				status:   "offline",
+			})
+		}
+		return nil
+	}
+
+	repoNodesMap := make(map[string]repo.Node, len(repoNodes))
+	for _, repoNode := range repoNodes {
+		repoNodesMap[repoNode.IPAddress] = repoNode
+	}
+	for i, nod := range n.records {
+		repoNode, ok := repoNodesMap[nod.ip]
+		if ok {
+			n.records[i].newRec = false
+			n.records[i].changed = false
+			n.records[i].user = repoNode.UserName
+			n.records[i].password = repoNode.Password
+		}
+	}
+	pageNodesMap := make(map[string]node, len(n.records))
+	for _, nod := range n.records {
+		pageNodesMap[nod.ip] = nod
+	}
+	for _, repoNode := range repoNodes {
+		nod, ok := pageNodesMap[repoNode.IPAddress]
+		if !ok {
+			nod.status = "offline"
+			n.records = append(n.records, nod)
+		}
+	}
+	return nil
+}
+
+func (n *nodes) saveRecords() error {
+	newRepos := make([]repo.Node, 0, len(n.records))
+	updRepos := make([]repo.Node, 0, len(n.records))
+	n.Lock()
+	defer n.Unlock()
+	for _, rec := range n.records {
+		nowaTime := time.Now().Local()
+		if rec.newRec {
+			newRepos = append(newRepos, repo.Node{
+				IPAddress:  rec.ip,
+				UserName:   rec.user,
+				Password:   rec.password,
+				CreateTime: nowaTime,
+				UpdateTime: nowaTime,
+			})
+			continue
+		}
+		if rec.changed {
+			updRepos = append(updRepos, repo.Node{
+				IPAddress:  rec.ip,
+				UserName:   rec.user,
+				Password:   rec.password,
+				UpdateTime: nowaTime,
+			})
+		}
+	}
+	if len(newRepos) > 0 {
+		if err := dblayer.DB.AddNodes(newRepos); err != nil {
+			return err
+		}
+	}
+	if len(updRepos) > 0 {
+		for _, r := range updRepos {
+			if err := dblayer.DB.UpdateNode(&r); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (n *nodes) deleteRecords() error {
+	newRecs := []node{}
+	for _, rec := range n.records {
+		if rec.checked {
+			if !rec.newRec {
+				if err := dblayer.DB.DeleteNode(rec.ip); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+		newRecs = append(newRecs, rec)
+	}
+	n.records = newRecs
+	return nil
 }
 
 func validateIP(ip string) error {

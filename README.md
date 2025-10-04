@@ -1,2 +1,2 @@
 # ltool
-lustre GUI tool
+lustre GUI tool with fyne/v2
