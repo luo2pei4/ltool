@@ -23,7 +23,7 @@ func (s *sqliteLayer) ListNodes(ip string) ([]repo.Node, error) {
 	if ip == "" {
 		err = s.Table(consts.TableNodes).Find(&nodes).Error
 	} else {
-		condition := "ip_address like " + "%" + ip + "%"
+		condition := "ip_address like " + "'%" + ip + "%'"
 		err = s.Table(consts.TableNodes).Find(&nodes, condition).Error
 	}
 	return nodes, err
