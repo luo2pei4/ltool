@@ -262,12 +262,12 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 		// set focus on ip entry
 		w.Canvas().Focus(ipEntry)
 	})
-	inputForm := container.NewGridWithColumns(4, ipEntry, userEntry, passEntry, addBtn)
+	inputArea := container.NewGridWithColumns(4, ipEntry, userEntry, passEntry, addBtn)
 
 	// layout
 	content := container.NewBorder(
 		container.NewVBox(
-			inputForm,
+			inputArea,
 			widget.NewSeparator(),
 		),
 		btnBar, // bottom
