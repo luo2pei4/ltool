@@ -248,7 +248,6 @@ func validateIP(ip string) error {
 }
 
 func (n *nodes) startStatusMonitor() {
-	fmt.Println("start nodes status monitor")
 	timer := time.NewTimer(time.Second)
 	var ipList []string
 	for {

@@ -144,7 +144,6 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 	}
 
 	go func(n *nodes) {
-		fmt.Println("start node status change receiver.")
 		for {
 			select {
 			case <-n.statusChgCh:
@@ -152,7 +151,6 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 					list.Refresh()
 				})
 			case <-nodePageDoneCh:
-				fmt.Println("close node status change receiver.")
 				return
 			}
 		}
