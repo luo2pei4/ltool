@@ -39,13 +39,15 @@ func (n *nodes) addNode(ip, user, password string) {
 	arr := strings.Split(ip, "-")
 	if len(arr) == 1 {
 		ipList := make([]string, 0, 1)
+		n.Lock()
 		n.records = append(n.records, node{
 			ip:       ip,
 			user:     user,
 			password: password,
-			status:   "offline",
+			status:   "unknown",
 			newRec:   true,
 		})
+		n.Unlock()
 		ipList = append(ipList, ip)
 		n.ipsCh <- ipList
 		return
@@ -55,13 +57,15 @@ func (n *nodes) addNode(ip, user, password string) {
 	fromNodeIP, _ := strconv.Atoi(tmp[3])
 	if toNodeIP == fromNodeIP {
 		ipList := make([]string, 0, 1)
+		n.Lock()
 		n.records = append(n.records, node{
 			ip:       ip,
 			user:     user,
 			password: password,
-			status:   "offline",
+			status:   "unknown",
 			newRec:   true,
 		})
+		n.Unlock()
 		ipList = append(ipList, ip)
 		n.ipsCh <- ipList
 		return
@@ -73,6 +77,7 @@ func (n *nodes) addNode(ip, user, password string) {
 	if toNodeIP < fromNodeIP {
 		fromNodeIP, toNodeIP = toNodeIP, fromNodeIP
 	}
+	n.Lock()
 	ipList := make([]string, 0, len(tmpMap))
 	for ; fromNodeIP <= toNodeIP; fromNodeIP++ {
 		tmp[3] = strconv.Itoa(fromNodeIP)
@@ -84,15 +89,18 @@ func (n *nodes) addNode(ip, user, password string) {
 			ip:       ip,
 			user:     user,
 			password: password,
-			status:   "offline",
+			status:   "unknown",
 			newRec:   true,
 		})
 		ipList = append(ipList, ip)
 	}
+	n.Unlock()
 	n.ipsCh <- ipList
 }
 
 func (n *nodes) makeSelectedStatsMsg() string {
+	n.RLock()
+	defer n.RUnlock()
 	total := len(n.records)
 	selected := 0
 	newRecs := 0
@@ -120,15 +128,15 @@ func (n *nodes) getRecords(ip string) error {
 		return err
 	}
 
+	n.Lock()
+	defer n.Unlock()
 	if len(n.records) == 0 {
-		n.Lock()
-		defer n.Unlock()
 		for _, repoNode := range repoNodes {
 			n.records = append(n.records, node{
 				ip:       repoNode.IPAddress,
 				user:     repoNode.UserName,
 				password: repoNode.Password,
-				status:   "offline",
+				status:   "unknown",
 			})
 		}
 		return nil
@@ -154,7 +162,7 @@ func (n *nodes) getRecords(ip string) error {
 	for _, repoNode := range repoNodes {
 		nod, ok := pageNodesMap[repoNode.IPAddress]
 		if !ok {
-			nod.status = "offline"
+			nod.status = "unknown"
 			n.records = append(n.records, nod)
 		}
 	}
@@ -215,6 +223,8 @@ func (n *nodes) deleteRecords() error {
 		}
 		newRecs = append(newRecs, rec)
 	}
+	n.Lock()
+	defer n.Unlock()
 	n.records = newRecs
 	return nil
 }
@@ -300,7 +310,6 @@ func (n *nodes) detectStatus(ipList []string) {
 		}
 	}
 	n.Lock()
-	defer n.Unlock()
 	changed := false
 	for idx, rec := range n.records {
 		if status, ok := statusMap[rec.ip]; ok {
@@ -311,6 +320,7 @@ func (n *nodes) detectStatus(ipList []string) {
 			}
 		}
 	}
+	n.Unlock()
 	if changed {
 		n.statusChgCh <- struct{}{}
 	}
@@ -342,5 +352,5 @@ func Cleanup() {
 		nodePageDoneCh <- struct{}{}
 		return
 	}
-	fmt.Println("nodePageDoneCh closed")
+	fmt.Println("Warning: nodePageDoneCh closed")
 }
