@@ -72,7 +72,9 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 
 			// check
 			checkbox.OnChanged = func(checked bool) {
+				ns.Lock()
 				ns.records[id].checked = checked
+				ns.Unlock()
 				selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
 			}
 			checkbox.SetChecked(ns.records[id].checked)
@@ -82,6 +84,7 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 
 			// modify user
 			userInput.OnChanged = func(user string) {
+				ns.Lock()
 				init := false
 				if ns.records[id].user == user {
 					init = true
@@ -92,6 +95,7 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 				} else {
 					ns.records[id].changed = false
 				}
+				ns.Unlock()
 				selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
 				if ns.records[id].changed {
 					ns.statusChgCh <- struct{}{}
@@ -101,6 +105,7 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 
 			// modify password
 			passInput.OnChanged = func(pass string) {
+				ns.Lock()
 				init := false
 				if ns.records[id].password == pass {
 					init = true
@@ -111,6 +116,7 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 				} else {
 					ns.records[id].changed = false
 				}
+				ns.Unlock()
 				selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
 				if ns.records[id].changed {
 					ns.statusChgCh <- struct{}{}
@@ -144,7 +150,6 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 	}
 
 	go func(n *nodes) {
-		fmt.Println("start node status change receiver.")
 		for {
 			select {
 			case <-n.statusChgCh:
@@ -152,23 +157,26 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 					list.Refresh()
 				})
 			case <-nodePageDoneCh:
-				fmt.Println("close node status change receiver.")
 				return
 			}
 		}
 	}(ns)
 
 	selectAllBtn := widget.NewButton("Select All", func() {
+		ns.Lock()
 		for i := range ns.records {
 			ns.records[i].checked = true
 		}
+		ns.Unlock()
 		selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
 		list.Refresh()
 	})
 	unselectAllBtn := widget.NewButton("Unselect All", func() {
+		ns.Lock()
 		for i := range ns.records {
 			ns.records[i].checked = false
 		}
+		ns.Unlock()
 		selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
 		list.Refresh()
 	})
@@ -178,11 +186,13 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 			return
 		}
 		checkedRec := 0
+		ns.RLock()
 		for _, rec := range ns.records {
 			if rec.checked {
 				checkedRec++
 			}
 		}
+		ns.RUnlock()
 		if checkedRec > 0 {
 			dialog.ShowCustomConfirm(
 				"Delete confirm",
@@ -253,9 +263,11 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 		}
 
 		ns.addNode(ip, user, pass)
+		ns.Lock()
 		sort.SliceStable(ns.records, func(i, j int) bool {
 			return ns.records[i].ip < ns.records[j].ip
 		})
+		ns.Unlock()
 		selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
 		list.Refresh()
 		// show bottom widgets
@@ -264,12 +276,12 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 		// set focus on ip entry
 		w.Canvas().Focus(ipEntry)
 	})
-	inputForm := container.NewGridWithColumns(4, ipEntry, userEntry, passEntry, addBtn)
+	inputArea := container.NewGridWithColumns(4, ipEntry, userEntry, passEntry, addBtn)
 
 	// layout
 	content := container.NewBorder(
 		container.NewVBox(
-			inputForm,
+			inputArea,
 			widget.NewSeparator(),
 		),
 		btnBar, // bottom

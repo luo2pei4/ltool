@@ -4,6 +4,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/widget"
 	"github.com/luo2pei4/ltool/ui/pages"
+	"github.com/luo2pei4/ltool/ui/pages/lnet"
 	"github.com/luo2pei4/ltool/ui/pages/node"
 )
 
@@ -17,7 +18,7 @@ var (
 	MenuItems = map[string]Page{
 		"lustre": {"Lustre", "", firstScreen},
 		"node":   {"Node", "", node.NodeScreen},
-		"lnet":   {"LNet", "", pages.LNetScreen},
+		"lnet":   {"LNet", "", lnet.LNetScreen},
 		"fs":     {"Filesystem", "", pages.FilesystemScreen},
 		"mgs":    {"MGS", "", pages.MGSScreen},
 		"mds":    {"MDS", "", pages.MDSScreen},
