@@ -76,7 +76,7 @@ func makeNav(setPage func(page ui.Page)) fyne.CanvasObject {
 		},
 		OnSelected: func(uid string) {
 			for id, f := range ui.OnChangedFunc {
-				if id == uid {
+				if id == uid || f == nil {
 					continue
 				}
 				f()

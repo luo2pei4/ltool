@@ -33,7 +33,7 @@ type nodes struct {
 	statusChgCh chan struct{}
 }
 
-var nodePageDoneCh = make(chan struct{}, 1)
+var nodePageDoneCh chan struct{}
 
 func (n *nodes) addNode(ip, user, password string) {
 	arr := strings.Split(ip, "-")
@@ -259,6 +259,7 @@ func validateIP(ip string) error {
 
 func (n *nodes) startStatusMonitor() {
 	timer := time.NewTimer(time.Second)
+	nodePageDoneCh = make(chan struct{})
 	var ipList []string
 	for {
 		select {
@@ -349,8 +350,8 @@ func reachable(ip, port string, timeout time.Duration, retry int) bool {
 
 func Cleanup() {
 	if nodePageDoneCh != nil {
-		nodePageDoneCh <- struct{}{}
-		return
+		fmt.Println("close node page done chan and clean chan.")
+		close(nodePageDoneCh)
+		nodePageDoneCh = nil
 	}
-	fmt.Println("Warning: nodePageDoneCh closed")
 }
