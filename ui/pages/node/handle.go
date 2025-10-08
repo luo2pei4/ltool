@@ -258,6 +258,9 @@ func validateIP(ip string) error {
 }
 
 func (n *nodes) startStatusMonitor() {
+	defer func() {
+		fmt.Println("leaving status monitor")
+	}()
 	timer := time.NewTimer(time.Second)
 	nodePageDoneCh = make(chan struct{})
 	var ipList []string
@@ -270,11 +273,16 @@ func (n *nodes) startStatusMonitor() {
 				ipList = append(ipList, rec.ip)
 			}
 			n.RUnlock()
+			timer.Reset(time.Second * 60)
 		case ips := <-n.ipsCh:
 			ipList = ips
+		case <-nodePageDoneCh:
+			return
 		}
 		n.detectStatus(ipList)
-		timer.Reset(time.Second * 60)
+		if nodePageDoneCh == nil {
+			return
+		}
 	}
 }
 
@@ -292,7 +300,7 @@ func (n *nodes) detectStatus(ipList []string) {
 		wg.Add(1)
 		go func(ip string) {
 			defer wg.Done()
-			if reachable(ip, "22", time.Second*5, 3) {
+			if reachable(ip, "22", time.Second, 5) {
 				resultCh <- ip + "-online"
 			} else {
 				resultCh <- ip + "-offline"
@@ -303,6 +311,10 @@ func (n *nodes) detectStatus(ipList []string) {
 	cnt := 0
 	statusMap := make(map[string]string, len(ipList))
 	for res := range resultCh {
+		if nodePageDoneCh == nil {
+			fmt.Println("return detect status func directly")
+			return
+		}
 		arr := strings.Split(res, "-")
 		statusMap[arr[0]] = arr[1]
 		cnt++
@@ -322,7 +334,9 @@ func (n *nodes) detectStatus(ipList []string) {
 		}
 	}
 	n.Unlock()
-	if changed {
+	// selecting other page when detecting node status
+	if nodePageDoneCh != nil && changed {
+		fmt.Println("send status change")
 		n.statusChgCh <- struct{}{}
 	}
 }
@@ -350,7 +364,7 @@ func reachable(ip, port string, timeout time.Duration, retry int) bool {
 
 func Cleanup() {
 	if nodePageDoneCh != nil {
-		fmt.Println("close node page done chan and clean chan.")
+		fmt.Println("close nodePageDoneCh")
 		close(nodePageDoneCh)
 		nodePageDoneCh = nil
 	}

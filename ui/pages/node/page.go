@@ -153,10 +153,14 @@ func NodeScreen(w fyne.Window) fyne.CanvasObject {
 		for {
 			select {
 			case <-n.statusChgCh:
+				fmt.Println("receiving status change")
 				fyne.Do(func() {
+					n.RLock()
+					defer n.RUnlock()
 					list.Refresh()
 				})
 			case <-nodePageDoneCh:
+				fmt.Println("leaving refresh goroutine")
 				return
 			}
 		}
