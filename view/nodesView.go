@@ -1,27 +1,30 @@
 package view
 
 import (
+	"fmt"
 	"image/color"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
+	"github.com/luo2pei4/ltool/pkg/utils"
 	"github.com/luo2pei4/ltool/view/state"
 )
 
 type NodesUI struct {
-	state              *state.NodesState
-	records            *widget.List
-	ipEntry            *widget.Entry
-	userEntry          *widget.Entry
-	passEntry          *widget.Entry
-	addBtn             *widget.Button
-	selectAllBtn       *widget.Button
-	unselectAllBtn     *widget.Button
-	deleteBtn          *widget.Button
-	saveBtn            *widget.Button
-	selectedStatsLabel *widget.Label
+	state          *state.NodesState
+	records        *widget.List
+	ipEntry        *widget.Entry
+	userEntry      *widget.Entry
+	passEntry      *widget.Entry
+	addBtn         *widget.Button
+	selectAllBtn   *widget.Button
+	unselectAllBtn *widget.Button
+	deleteBtn      *widget.Button
+	saveBtn        *widget.Button
+	statsLabel     *widget.Label
 }
 
 func NewNodesUI() View {
@@ -39,20 +42,49 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 	n.passEntry = widget.NewPasswordEntry()
 	n.passEntry.SetPlaceHolder("user password")
 	n.passEntry.Password = false
-	n.addBtn = widget.NewButton("+", func() {})
+	n.addBtn = widget.NewButton("+", func() {
+		ip := n.ipEntry.Text
+		user := n.userEntry.Text
+		pass := n.passEntry.Text
+		switch {
+		case ip == "":
+			w.Canvas().Focus(n.ipEntry)
+			return
+		case user == "":
+			w.Canvas().Focus(n.userEntry)
+			return
+		case pass == "":
+			w.Canvas().Focus(n.passEntry)
+			return
+		default:
+		}
+		if err := utils.ValidateIP(ip); err != nil {
+			dialog.ShowCustom("Warning", "Close", widget.NewLabel(err.Error()), w)
+			w.Canvas().Focus(n.ipEntry)
+			return
+		}
+	})
 	inputArea := container.NewGridWithColumns(4, n.ipEntry, n.userEntry, n.passEntry, n.addBtn)
 
-	n.selectAllBtn = widget.NewButton("Select All", func() {})
-	n.unselectAllBtn = widget.NewButton("Unselect All", func() {})
+	n.selectAllBtn = widget.NewButton("Select All", func() {
+		n.state.SelectAllRecords()
+		n.records.Refresh()
+		n.updateStatsMsg()
+	})
+	n.unselectAllBtn = widget.NewButton("Unselect All", func() {
+		n.state.UnselectAllRecords()
+		n.records.Refresh()
+		n.updateStatsMsg()
+	})
 	n.deleteBtn = widget.NewButton("Delete", func() {})
 	n.saveBtn = widget.NewButton("Save", func() {})
-	n.selectedStatsLabel = widget.NewLabel("selected stats label")
+	n.statsLabel = widget.NewLabel("")
 	btnBar := container.NewBorder(
 		nil,
 		nil,
 		container.NewHBox(n.selectAllBtn, n.unselectAllBtn, n.deleteBtn),
 		n.saveBtn,
-		container.NewCenter(n.selectedStatsLabel),
+		container.NewCenter(n.statsLabel),
 	)
 
 	n.records = widget.NewList(
@@ -68,7 +100,6 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 			passInput := widget.NewPasswordEntry()
 			passInput.Password = false
 			statuscc := container.NewCenter(canvas.NewText("", color.Black))
-
 			inputArea := container.NewGridWithColumns(4, container.NewStack(bg, ipLabel), userInput, passInput, statuscc)
 			row := container.NewBorder(nil, nil, checkbox, nil, inputArea)
 			return row
@@ -91,57 +122,29 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 			ctext := statuscc.Objects[0].(*canvas.Text)
 
 			// check
-			// checkbox.OnChanged = func(checked bool) {
-			// 	n.state.Lock()
-			// 	n.state.Records[id].Checked = checked
-			// 	n.state.Unlock()
-			// 	selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
-			// }
+			checkbox.OnChanged = func(checked bool) {
+				n.state.CheckedRecord(id, checked)
+				n.updateStatsMsg()
+			}
 			checkbox.SetChecked(n.state.Records[id].Checked)
 
-			// show ip address
+			// display ip address
 			ipLabel.SetText(n.state.Records[id].IP)
 
-			// modify user
-			// userInput.OnChanged = func(user string) {
-			// 	ns.Lock()
-			// 	init := false
-			// 	if ns.records[id].user == user {
-			// 		init = true
-			// 	}
-			// 	ns.records[id].user = user
-			// 	if !init {
-			// 		ns.records[id].changed = true
-			// 	} else {
-			// 		ns.records[id].changed = false
-			// 	}
-			// 	ns.Unlock()
-			// 	selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
-			// 	if ns.records[id].changed {
-			// 		ns.statusChgCh <- struct{}{}
-			// 	}
-			// }
+			// change user
+			userInput.OnChanged = func(user string) {
+				n.state.ChangeUser(id, user)
+				bg.FillColor = n.state.GetFillColor(id)
+				n.updateStatsMsg()
+			}
 			userInput.SetText(n.state.Records[id].User)
 
-			// modify password
-			// passInput.OnChanged = func(pass string) {
-			// 	ns.Lock()
-			// 	init := false
-			// 	if ns.records[id].password == pass {
-			// 		init = true
-			// 	}
-			// 	ns.records[id].password = pass
-			// 	if !init {
-			// 		ns.records[id].changed = true
-			// 	} else {
-			// 		ns.records[id].changed = false
-			// 	}
-			// 	ns.Unlock()
-			// 	selectedStatsLabel.SetText(ns.makeSelectedStatsMsg())
-			// 	if ns.records[id].changed {
-			// 		ns.statusChgCh <- struct{}{}
-			// 	}
-			// }
+			// change password
+			passInput.OnChanged = func(pass string) {
+				n.state.ChangePassword(id, pass)
+				bg.FillColor = n.state.GetFillColor(id)
+				n.updateStatsMsg()
+			}
 			passInput.SetText(n.state.Records[id].Password)
 
 			if n.state.Records[id].Status == "online" {
@@ -150,21 +153,14 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 				ctext.Color = color.RGBA{R: 235, G: 51, B: 36, A: 255}
 			}
 			ctext.Text = n.state.Records[id].Status
-
-			if n.state.Records[id].NewRec {
-				bg.FillColor = color.RGBA{R: 34, G: 177, B: 76, A: 255} // light green
-			} else if n.state.Records[id].Changed {
-				bg.FillColor = color.RGBA{R: 50, G: 130, B: 246, A: 255} // light blue
-			} else {
-				bg.FillColor = color.Transparent
-			}
 		},
 	)
 
 	if err := n.state.LoadAllRecords(); err != nil {
-		n.selectedStatsLabel.Text = err.Error()
-	} else {
+		fmt.Printf("loading all records failed, %v", err)
+	} else if len(n.state.Records) > 0 {
 		n.records.Refresh()
+		n.updateStatsMsg()
 	}
 
 	content := container.NewBorder(
@@ -181,3 +177,7 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 }
 
 func (n *NodesUI) Cleanup() {}
+
+func (n *NodesUI) updateStatsMsg() {
+	n.statsLabel.SetText(n.state.MakeStatsMsg())
+}
