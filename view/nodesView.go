@@ -58,11 +58,18 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 			return
 		default:
 		}
-		if err := utils.ValidateIP(ip); err != nil {
+		if err := utils.ValidateIPv4(ip); err != nil {
 			dialog.ShowCustom("Warning", "Close", widget.NewLabel(err.Error()), w)
+			// set focus on ip entry
 			w.Canvas().Focus(n.ipEntry)
 			return
 		}
+		// add node
+		n.state.AddNode(ip, user, pass)
+		// refresh records list
+		n.records.Refresh()
+		// set focus on ip entry
+		w.Canvas().Focus(n.ipEntry)
 	})
 	inputArea := container.NewGridWithColumns(4, n.ipEntry, n.userEntry, n.passEntry, n.addBtn)
 
@@ -130,6 +137,8 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 
 			// display ip address
 			ipLabel.SetText(n.state.Records[id].IP)
+			// set background color
+			bg.FillColor = n.state.GetFillColor(id)
 
 			// change user
 			userInput.OnChanged = func(user string) {

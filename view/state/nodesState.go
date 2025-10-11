@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"image/color"
+	"sort"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/luo2pei4/ltool/pkg/dblayer"
@@ -72,6 +75,81 @@ func (n *NodesState) MakeStatsMsg() string {
 		}
 	}
 	return fmt.Sprintf("total: %d, new: %d, changed: %d, selected: %d", total, newRecs, changed, selected)
+}
+
+func (n *NodesState) AddNode(ip, user, password string) {
+
+	n.RLock()
+	tmpMap := make(map[string]struct{})
+	for _, rec := range n.Records {
+		tmpMap[rec.IP] = struct{}{}
+	}
+	n.RUnlock()
+
+	// sort records by ip address
+	defer func() {
+		sort.SliceStable(n.Records, func(i, j int) bool {
+			return n.Records[i].IP < n.Records[j].IP
+		})
+	}()
+
+	arr := strings.Split(ip, "-")
+	if len(arr) == 1 {
+		if _, ok := tmpMap[ip]; ok {
+			return
+		}
+		n.Lock()
+		defer n.Unlock()
+		n.Records = append(n.Records, Node{
+			IP:       ip,
+			User:     user,
+			Password: password,
+			Status:   "unknown",
+			NewRec:   true,
+		})
+		return
+	}
+
+	toNodeIP, _ := strconv.Atoi(arr[1])
+	tmp := strings.Split(arr[0], ".")
+	fromNodeIP, _ := strconv.Atoi(tmp[3])
+	if toNodeIP == fromNodeIP {
+		if _, ok := tmpMap[arr[0]]; ok {
+			return
+		}
+		n.Lock()
+		defer n.Unlock()
+		n.Records = append(n.Records, Node{
+			IP:       arr[0],
+			User:     user,
+			Password: password,
+			Status:   "unknown",
+			NewRec:   true,
+		})
+		return
+	}
+
+	// to is less than from, switch
+	if toNodeIP < fromNodeIP {
+		fromNodeIP, toNodeIP = toNodeIP, fromNodeIP
+	}
+
+	n.Lock()
+	defer n.Unlock()
+	for ; fromNodeIP <= toNodeIP; fromNodeIP++ {
+		tmp[3] = strconv.Itoa(fromNodeIP)
+		ip := strings.Join(tmp, ".")
+		if _, ok := tmpMap[ip]; ok {
+			continue
+		}
+		n.Records = append(n.Records, Node{
+			IP:       ip,
+			User:     user,
+			Password: password,
+			Status:   "unknown",
+			NewRec:   true,
+		})
+	}
 }
 
 func (n *NodesState) SelectAllRecords() {
