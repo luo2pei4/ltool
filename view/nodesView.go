@@ -113,7 +113,18 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 		n.state.CheckNodesStatus()
 		n.records.Refresh()
 	})
-	n.saveBtn = widget.NewButton("Save", func() {})
+	n.saveBtn = widget.NewButton("Save", func() {
+		if err := n.state.SaveRecords(); err != nil {
+			dialog.ShowCustom("Error", "Close", widget.NewLabel(err.Error()), w)
+			return
+		}
+		if err := n.state.LoadAllRecords(); err != nil {
+			dialog.ShowCustom("Error", "Close", widget.NewLabel(fmt.Sprintf("reload nodes failed, %v", err)), w)
+			return
+		}
+		n.updateStatsMsg()
+		n.records.Refresh()
+	})
 	n.statsLabel = widget.NewLabel("")
 	btnBar := container.NewBorder(
 		nil,
@@ -193,7 +204,7 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 	)
 
 	if err := n.state.LoadAllRecords(); err != nil {
-		fmt.Printf("loading all records failed, %v", err)
+		fmt.Printf("loading all records failed, %v\n", err)
 	} else if len(n.state.Records) > 0 {
 		n.records.Refresh()
 		n.updateStatsMsg()

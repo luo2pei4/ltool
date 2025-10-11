@@ -13,7 +13,7 @@ func LNetScreen(w fyne.Window) fyne.CanvasObject {
 	nodeListBox := widget.NewSelectEntry([]string{})
 	ipList, err := getNodesList()
 	if err != nil {
-		fmt.Printf("load node ip failed, %v", err)
+		fmt.Printf("load node ip failed, %v\n", err)
 	} else {
 		nodeListBox.SetOptions(ipList)
 	}

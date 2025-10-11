@@ -31,7 +31,7 @@ func main() {
 
 	// init database layer
 	if err := dblayer.Init("sqlite", "./ltool.db"); err != nil {
-		fmt.Printf("initialize database instance failed, %v", err)
+		fmt.Printf("initialize database instance failed, %v\n", err)
 		os.Exit(1)
 	}
 

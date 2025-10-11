@@ -8,8 +8,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/luo2pei4/ltool/pkg/dblayer"
+	"github.com/luo2pei4/ltool/pkg/dblayer/repo"
 	"github.com/luo2pei4/ltool/pkg/utils"
 	"gorm.io/gorm"
 )
@@ -53,6 +55,33 @@ func (n *NodesState) LoadAllRecords() error {
 			})
 		}
 	}
+
+	repoNodesMap := make(map[string]repo.Node, len(repoNodes))
+	for _, repoNode := range repoNodes {
+		repoNodesMap[repoNode.IPAddress] = repoNode
+	}
+	for i, nod := range n.Records {
+		repoNode, ok := repoNodesMap[nod.IP]
+		if ok {
+			n.Records[i].NewRec = false
+			n.Records[i].Changed = false
+			n.Records[i].User = repoNode.UserName
+			n.Records[i].rawUser = repoNode.UserName
+			n.Records[i].Password = repoNode.Password
+			n.Records[i].rawPwd = repoNode.Password
+		}
+	}
+	pageNodesMap := make(map[string]Node, len(n.Records))
+	for _, nod := range n.Records {
+		pageNodesMap[nod.IP] = nod
+	}
+	for _, repoNode := range repoNodes {
+		nod, ok := pageNodesMap[repoNode.IPAddress]
+		if !ok {
+			nod.Status = "unknown"
+			n.Records = append(n.Records, nod)
+		}
+	}
 	return nil
 }
 
@@ -73,7 +102,7 @@ func (n *NodesState) MakeStatsMsg() string {
 			changed++
 		}
 	}
-	return fmt.Sprintf("total: %d, new: %d, changed: %d, selected: %d", total, newRecs, changed, selected)
+	return fmt.Sprintf("Total: %d, New: %d, Changed: %d, Checked: %d", total, newRecs, changed, selected)
 }
 
 func (n *NodesState) AddNode(ip, user, password string) {
@@ -201,6 +230,47 @@ func (n *NodesState) DeleteRecords() error {
 	return nil
 }
 
+func (n *NodesState) SaveRecords() error {
+	newRepos := make([]repo.Node, 0, len(n.Records))
+	updRepos := make([]repo.Node, 0, len(n.Records))
+	n.Lock()
+	defer n.Unlock()
+	for _, rec := range n.Records {
+		nowaTime := time.Now().Local()
+		if rec.NewRec {
+			newRepos = append(newRepos, repo.Node{
+				IPAddress:  rec.IP,
+				UserName:   rec.User,
+				Password:   rec.Password,
+				CreateTime: nowaTime,
+				UpdateTime: nowaTime,
+			})
+			continue
+		}
+		if rec.Changed {
+			updRepos = append(updRepos, repo.Node{
+				IPAddress:  rec.IP,
+				UserName:   rec.User,
+				Password:   rec.Password,
+				UpdateTime: nowaTime,
+			})
+		}
+	}
+	if len(newRepos) > 0 {
+		if err := dblayer.DB.AddNodes(newRepos); err != nil {
+			return err
+		}
+	}
+	if len(updRepos) > 0 {
+		for _, r := range updRepos {
+			if err := dblayer.DB.UpdateNode(&r); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (n *NodesState) GetNodeRecord(id int) Node {
 	n.Lock()
 	defer n.Unlock()
@@ -304,7 +374,7 @@ func (n *NodesState) detectStatus(ipList []string) {
 					resultCh <- ip + "-offline"
 				}
 			} else {
-				fmt.Printf("ping error, %v", err)
+				fmt.Printf("ping '%s' error, %v\n", ip, err)
 				resultCh <- ip + "-unknown"
 			}
 		}(ip)
