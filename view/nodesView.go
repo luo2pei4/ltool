@@ -23,6 +23,7 @@ type NodesUI struct {
 	selectAllBtn   *widget.Button
 	unselectAllBtn *widget.Button
 	deleteBtn      *widget.Button
+	statusBtn      *widget.Button
 	saveBtn        *widget.Button
 	statsLabel     *widget.Label
 }
@@ -84,13 +85,17 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 		n.updateStatsMsg()
 	})
 	n.deleteBtn = widget.NewButton("Delete", func() {})
+	n.statusBtn = widget.NewButton("Status", func() {
+		n.state.CheckNodesStatus()
+		n.records.Refresh()
+	})
 	n.saveBtn = widget.NewButton("Save", func() {})
 	n.statsLabel = widget.NewLabel("")
 	btnBar := container.NewBorder(
 		nil,
 		nil,
 		container.NewHBox(n.selectAllBtn, n.unselectAllBtn, n.deleteBtn),
-		n.saveBtn,
+		container.NewHBox(n.statusBtn, n.saveBtn),
 		container.NewCenter(n.statsLabel),
 	)
 

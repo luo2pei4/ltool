@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/luo2pei4/ltool/pkg/dblayer"
+	"github.com/luo2pei4/ltool/pkg/utils"
 	"gorm.io/gorm"
 )
 
@@ -27,9 +28,7 @@ type Node struct {
 
 type NodesState struct {
 	sync.RWMutex
-	Records        []Node
-	IPsCh          chan []string
-	StatusChangeCh chan struct{}
+	Records []Node
 }
 
 func (n *NodesState) LoadAllRecords() error {
@@ -238,5 +237,63 @@ func (n *NodesState) GetStatusColor(status string) color.Color {
 		return color.RGBA{R: 34, G: 177, B: 76, A: 255}
 	default:
 		return color.RGBA{R: 235, G: 51, B: 36, A: 255}
+	}
+}
+
+func (n *NodesState) CheckNodesStatus() {
+	var ipList []string
+	ipList = make([]string, 0, len(n.Records))
+	n.RLock()
+	for _, rec := range n.Records {
+		ipList = append(ipList, rec.IP)
+	}
+	n.RUnlock()
+	n.detectStatus(ipList)
+}
+
+func (n *NodesState) detectStatus(ipList []string) {
+	if len(ipList) == 0 {
+		return
+	}
+	resultCh := make(chan string, len(ipList))
+	defer close(resultCh)
+
+	var wg sync.WaitGroup
+	for _, ip := range ipList {
+		wg.Add(1)
+		go func(ip string) {
+			defer wg.Done()
+			if pingable, err := utils.Ping(ip); err == nil {
+				if pingable {
+					resultCh <- ip + "-online"
+				} else {
+					resultCh <- ip + "-offline"
+				}
+			} else {
+				fmt.Printf("ping error, %v", err)
+				resultCh <- ip + "-unknown"
+			}
+		}(ip)
+	}
+	wg.Wait()
+	cnt := 0
+	statusMap := make(map[string]string, len(ipList))
+	for res := range resultCh {
+		arr := strings.Split(res, "-")
+		statusMap[arr[0]] = arr[1]
+		if cnt++; cnt == len(ipList) {
+			break
+		}
+	}
+
+	n.Lock()
+	defer n.Unlock()
+	for idx, rec := range n.Records {
+		if status, ok := statusMap[rec.IP]; ok {
+			if n.Records[idx].Status != status {
+				fmt.Printf("status changed, ip: %s, new status: %s\n", rec.IP, status)
+				n.Records[idx].Status = status
+			}
+		}
 	}
 }
