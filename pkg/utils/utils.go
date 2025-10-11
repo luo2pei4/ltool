@@ -6,16 +6,18 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/luo2pei4/ltool/pkg/consts"
+	probing "github.com/prometheus-community/pro-bing"
 )
 
-func ValidateIP(ip string) error {
-	// check ip address format
-	// support xxx.xxx.xxx.xxx-x format, "-x" mains 'to x'
+// ValidateIPv4 validate ipv4 address
+// support xxx.xxx.xxx.xxx-xxx format, "-xxx" mains 'to xxx'
+func ValidateIPv4(ip string) error {
 	arr := strings.Split(ip, "-")
 	if len(arr) > 2 {
-		return errors.New("invalid ip address format")
+		return errors.New("unsupported ip address format")
 	}
 	if len(arr) == 1 || len(arr) == 2 {
 		matched, err := regexp.MatchString(consts.IPv4Pattern, arr[0])
@@ -36,4 +38,23 @@ func ValidateIP(ip string) error {
 		}
 	}
 	return nil
+}
+
+func Ping(ip string) (bool, error) {
+	pinger, err := probing.NewPinger(ip)
+	if err != nil {
+		return false, err
+	}
+	pinger.Count = 3                 // sends and receives three packets
+	pinger.Timeout = time.Second * 3 // timeout
+	pinger.SetPrivileged(true)
+	err = pinger.Run()
+	if err != nil {
+		return false, err
+	}
+	stats := pinger.Statistics()
+	if stats.PacketsRecv > 0 {
+		return true, nil
+	}
+	return false, nil
 }

@@ -23,6 +23,7 @@ type NodesUI struct {
 	selectAllBtn   *widget.Button
 	unselectAllBtn *widget.Button
 	deleteBtn      *widget.Button
+	statusBtn      *widget.Button
 	saveBtn        *widget.Button
 	statsLabel     *widget.Label
 }
@@ -58,11 +59,18 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 			return
 		default:
 		}
-		if err := utils.ValidateIP(ip); err != nil {
+		if err := utils.ValidateIPv4(ip); err != nil {
 			dialog.ShowCustom("Warning", "Close", widget.NewLabel(err.Error()), w)
+			// set focus on ip entry
 			w.Canvas().Focus(n.ipEntry)
 			return
 		}
+		// add node
+		n.state.AddNode(ip, user, pass)
+		// refresh records list
+		n.records.Refresh()
+		// set focus on ip entry
+		w.Canvas().Focus(n.ipEntry)
 	})
 	inputArea := container.NewGridWithColumns(4, n.ipEntry, n.userEntry, n.passEntry, n.addBtn)
 
@@ -76,14 +84,42 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 		n.records.Refresh()
 		n.updateStatsMsg()
 	})
-	n.deleteBtn = widget.NewButton("Delete", func() {})
+	n.deleteBtn = widget.NewButton("Delete", func() {
+		if cnt := n.state.GetCheckedRecordsCount(); cnt == 0 {
+			return
+		}
+		dialog.ShowCustomConfirm(
+			"Delete confirm",
+			"Yes", "No",
+			widget.NewLabel("Are you sure you want to delete the selected records?"),
+			func(confirm bool) {
+				if !confirm {
+					return
+				}
+				if err := n.state.DeleteRecords(); err != nil {
+					dialog.ShowCustom("Error", "Close", widget.NewLabel(err.Error()), w)
+					return
+				}
+				if err := n.state.LoadAllRecords(); err != nil {
+					dialog.ShowCustom("Error", "Close", widget.NewLabel(fmt.Sprintf("reload nodes failed, %v", err)), w)
+					return
+				}
+				n.updateStatsMsg()
+				n.records.Refresh()
+			}, w,
+		)
+	})
+	n.statusBtn = widget.NewButton("Status", func() {
+		n.state.CheckNodesStatus()
+		n.records.Refresh()
+	})
 	n.saveBtn = widget.NewButton("Save", func() {})
 	n.statsLabel = widget.NewLabel("")
 	btnBar := container.NewBorder(
 		nil,
 		nil,
 		container.NewHBox(n.selectAllBtn, n.unselectAllBtn, n.deleteBtn),
-		n.saveBtn,
+		container.NewHBox(n.statusBtn, n.saveBtn),
 		container.NewCenter(n.statsLabel),
 	)
 
@@ -121,15 +157,19 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 			statuscc := inputArea.Objects[3].(*fyne.Container)
 			ctext := statuscc.Objects[0].(*canvas.Text)
 
+			node := n.state.GetNodeRecord(id)
+
 			// check
 			checkbox.OnChanged = func(checked bool) {
 				n.state.CheckedRecord(id, checked)
 				n.updateStatsMsg()
 			}
-			checkbox.SetChecked(n.state.Records[id].Checked)
+			checkbox.SetChecked(node.Checked)
 
 			// display ip address
-			ipLabel.SetText(n.state.Records[id].IP)
+			ipLabel.SetText(node.IP)
+			// set background color
+			bg.FillColor = n.state.GetFillColor(id)
 
 			// change user
 			userInput.OnChanged = func(user string) {
@@ -137,7 +177,7 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 				bg.FillColor = n.state.GetFillColor(id)
 				n.updateStatsMsg()
 			}
-			userInput.SetText(n.state.Records[id].User)
+			userInput.SetText(node.User)
 
 			// change password
 			passInput.OnChanged = func(pass string) {
@@ -145,14 +185,10 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 				bg.FillColor = n.state.GetFillColor(id)
 				n.updateStatsMsg()
 			}
-			passInput.SetText(n.state.Records[id].Password)
+			passInput.SetText(node.Password)
 
-			if n.state.Records[id].Status == "online" {
-				ctext.Color = color.RGBA{R: 34, G: 177, B: 76, A: 255}
-			} else {
-				ctext.Color = color.RGBA{R: 235, G: 51, B: 36, A: 255}
-			}
-			ctext.Text = n.state.Records[id].Status
+			ctext.Text = node.Status
+			ctext.Color = n.state.GetStatusColor(node.Status)
 		},
 	)
 
