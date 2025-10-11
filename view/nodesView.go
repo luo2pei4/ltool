@@ -84,7 +84,31 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 		n.records.Refresh()
 		n.updateStatsMsg()
 	})
-	n.deleteBtn = widget.NewButton("Delete", func() {})
+	n.deleteBtn = widget.NewButton("Delete", func() {
+		if cnt := n.state.GetCheckedRecordsCount(); cnt == 0 {
+			return
+		}
+		dialog.ShowCustomConfirm(
+			"Delete confirm",
+			"Yes", "No",
+			widget.NewLabel("Are you sure you want to delete the selected records?"),
+			func(confirm bool) {
+				if !confirm {
+					return
+				}
+				if err := n.state.DeleteRecords(); err != nil {
+					dialog.ShowCustom("Error", "Close", widget.NewLabel(err.Error()), w)
+					return
+				}
+				if err := n.state.LoadAllRecords(); err != nil {
+					dialog.ShowCustom("Error", "Close", widget.NewLabel(fmt.Sprintf("reload nodes failed, %v", err)), w)
+					return
+				}
+				n.updateStatsMsg()
+				n.records.Refresh()
+			}, w,
+		)
+	})
 	n.statusBtn = widget.NewButton("Status", func() {
 		n.state.CheckNodesStatus()
 		n.records.Refresh()

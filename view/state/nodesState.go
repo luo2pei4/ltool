@@ -167,6 +167,40 @@ func (n *NodesState) UnselectAllRecords() {
 	}
 }
 
+func (n *NodesState) GetCheckedRecordsCount() int {
+	checkedRec := 0
+	n.RLock()
+	defer n.RUnlock()
+	for _, rec := range n.Records {
+		if rec.Checked {
+			checkedRec++
+		}
+	}
+	return checkedRec
+}
+
+func (n *NodesState) DeleteRecords() error {
+	if len(n.Records) == 0 {
+		return nil
+	}
+	newRecs := []Node{}
+	for _, rec := range n.Records {
+		if rec.Checked {
+			if !rec.NewRec {
+				if err := dblayer.DB.DeleteNode(rec.IP); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+		newRecs = append(newRecs, rec)
+	}
+	n.Lock()
+	defer n.Unlock()
+	n.Records = newRecs
+	return nil
+}
+
 func (n *NodesState) GetNodeRecord(id int) Node {
 	n.Lock()
 	defer n.Unlock()
