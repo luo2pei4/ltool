@@ -223,8 +223,6 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 	return content
 }
 
-func (n *NodesUI) Cleanup() {}
-
 func (n *NodesUI) updateStatsMsg() {
 	n.statsLabel.SetText(n.state.MakeStatsMsg())
 }

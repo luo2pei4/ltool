@@ -5,7 +5,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/luo2pei4/ltool/ui/pages"
 	"github.com/luo2pei4/ltool/ui/pages/lnet"
-	"github.com/luo2pei4/ltool/ui/pages/node"
 )
 
 type Page struct {
@@ -17,7 +16,6 @@ type Page struct {
 var (
 	MenuItems = map[string]Page{
 		"lustre": {"Lustre", "", firstScreen},
-		"node":   {"Node", "", node.NodeScreen},
 		"lnet":   {"LNet", "", lnet.LNetScreen},
 		"fs":     {"Filesystem", "", pages.FilesystemScreen},
 		"mgs":    {"MGS", "", pages.MGSScreen},
@@ -28,9 +26,7 @@ var (
 		"":       {"lustre"},
 		"lustre": {"node", "lnet", "fs", "mgs", "mds", "oss"},
 	}
-	OnChangedFunc = map[string]func(){
-		"node": node.Cleanup,
-	}
+	OnChangedFunc = map[string]func(){}
 )
 
 func firstScreen(_ fyne.Window) fyne.CanvasObject {

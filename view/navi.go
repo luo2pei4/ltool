@@ -30,5 +30,3 @@ var (
 func (f *firstScreen) CreateView(w fyne.Window) fyne.CanvasObject {
 	return widget.NewLabel("")
 }
-
-func (f *firstScreen) Cleanup() {}
