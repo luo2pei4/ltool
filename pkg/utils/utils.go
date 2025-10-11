@@ -6,8 +6,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/luo2pei4/ltool/pkg/consts"
+	probing "github.com/prometheus-community/pro-bing"
 )
 
 // ValidateIPv4 validate ipv4 address
@@ -36,4 +38,23 @@ func ValidateIPv4(ip string) error {
 		}
 	}
 	return nil
+}
+
+func Ping(ip string) (bool, error) {
+	pinger, err := probing.NewPinger(ip)
+	if err != nil {
+		return false, err
+	}
+	pinger.Count = 3                 // sends and receives three packets
+	pinger.Timeout = time.Second * 3 // timeout
+	pinger.SetPrivileged(true)
+	err = pinger.Run()
+	if err != nil {
+		return false, err
+	}
+	stats := pinger.Statistics()
+	if stats.PacketsRecv > 0 {
+		return true, nil
+	}
+	return false, nil
 }

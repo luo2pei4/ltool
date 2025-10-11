@@ -128,15 +128,17 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 			statuscc := inputArea.Objects[3].(*fyne.Container)
 			ctext := statuscc.Objects[0].(*canvas.Text)
 
+			node := n.state.GetNodeRecord(id)
+
 			// check
 			checkbox.OnChanged = func(checked bool) {
 				n.state.CheckedRecord(id, checked)
 				n.updateStatsMsg()
 			}
-			checkbox.SetChecked(n.state.Records[id].Checked)
+			checkbox.SetChecked(node.Checked)
 
 			// display ip address
-			ipLabel.SetText(n.state.Records[id].IP)
+			ipLabel.SetText(node.IP)
 			// set background color
 			bg.FillColor = n.state.GetFillColor(id)
 
@@ -146,7 +148,7 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 				bg.FillColor = n.state.GetFillColor(id)
 				n.updateStatsMsg()
 			}
-			userInput.SetText(n.state.Records[id].User)
+			userInput.SetText(node.User)
 
 			// change password
 			passInput.OnChanged = func(pass string) {
@@ -154,14 +156,10 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 				bg.FillColor = n.state.GetFillColor(id)
 				n.updateStatsMsg()
 			}
-			passInput.SetText(n.state.Records[id].Password)
+			passInput.SetText(node.Password)
 
-			if n.state.Records[id].Status == "online" {
-				ctext.Color = color.RGBA{R: 34, G: 177, B: 76, A: 255}
-			} else {
-				ctext.Color = color.RGBA{R: 235, G: 51, B: 36, A: 255}
-			}
-			ctext.Text = n.state.Records[id].Status
+			ctext.Text = node.Status
+			ctext.Color = n.state.GetStatusColor(node.Status)
 		},
 	)
 

@@ -168,6 +168,20 @@ func (n *NodesState) UnselectAllRecords() {
 	}
 }
 
+func (n *NodesState) GetNodeRecord(id int) Node {
+	n.Lock()
+	defer n.Unlock()
+	return Node{
+		IP:       n.Records[id].IP,
+		User:     n.Records[id].User,
+		Password: n.Records[id].Password,
+		Status:   n.Records[id].Status,
+		Checked:  n.Records[id].Checked,
+		NewRec:   n.Records[id].NewRec,
+		Changed:  n.Records[id].Changed,
+	}
+}
+
 func (n *NodesState) CheckedRecord(id int, checked bool) {
 	n.Lock()
 	defer n.Unlock()
@@ -215,5 +229,14 @@ func (n *NodesState) GetFillColor(id int) color.Color {
 		return color.RGBA{R: 50, G: 130, B: 246, A: 255} // light blue
 	} else {
 		return color.Transparent
+	}
+}
+
+func (n *NodesState) GetStatusColor(status string) color.Color {
+	switch status {
+	case "online":
+		return color.RGBA{R: 34, G: 177, B: 76, A: 255}
+	default:
+		return color.RGBA{R: 235, G: 51, B: 36, A: 255}
 	}
 }
