@@ -110,8 +110,16 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 		)
 	})
 	n.statusBtn = widget.NewButton("Status", func() {
-		n.state.CheckNodesStatus()
-		n.records.Refresh()
+		popup := showProgressing(w, "Checking, please wait...", 400)
+		go func() {
+			n.state.CheckNodesStatus()
+			fyne.Do(func() {
+				if popup != nil {
+					popup.Hide()
+				}
+				n.records.Refresh()
+			})
+		}()
 	})
 	n.saveBtn = widget.NewButton("Save", func() {
 		if err := n.state.SaveRecords(); err != nil {
