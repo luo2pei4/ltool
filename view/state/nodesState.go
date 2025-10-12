@@ -23,6 +23,10 @@ type Node struct {
 	Password string
 	rawPwd   string
 	Status   string
+	Hostname string
+	OS       string
+	Arch     string
+	Kernel   string
 	Checked  bool
 	NewRec   bool
 	Changed  bool
@@ -400,4 +404,18 @@ func (n *NodesState) detectStatus(ipList []string) {
 			}
 		}
 	}
+}
+
+func GetHostnamectl(host, user, password string) *utils.HostnamectlResult {
+	data, err := utils.RemoteCmd(host, user, password, "hostnamectl")
+	if err != nil {
+		return nil
+	}
+	result, err := utils.ParseHostnamectlResult(data)
+	if err != nil {
+		fmt.Printf("parse hostnamectl result failed, %v\n", err)
+		return nil
+	}
+	result.IPAddress = host
+	return result
 }

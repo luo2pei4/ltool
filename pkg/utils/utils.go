@@ -10,6 +10,7 @@ import (
 
 	"github.com/luo2pei4/ltool/pkg/consts"
 	probing "github.com/prometheus-community/pro-bing"
+	"golang.org/x/crypto/ssh"
 )
 
 // ValidateIPv4 validate ipv4 address
@@ -57,4 +58,32 @@ func Ping(ip string) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func RemoteCmd(host, user, password, cmd string) ([]byte, error) {
+	config := &ssh.ClientConfig{
+		User: user,
+		Auth: []ssh.AuthMethod{
+			ssh.Password(password),
+		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+	if len(strings.Split(host, ":")) == 1 {
+		host += ":22"
+	}
+	conn, err := ssh.Dial("tcp", host, config)
+	if err != nil {
+		return nil, fmt.Errorf("dail %s failed, %v", host, err)
+	}
+	defer conn.Close()
+	session, err := conn.NewSession()
+	if err != nil {
+		return nil, fmt.Errorf("create session failed, %v", err)
+	}
+	defer session.Close()
+	output, err := session.CombinedOutput(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("execute command failed, %v", err)
+	}
+	return output, nil
 }
