@@ -22,8 +22,8 @@ var (
 		"node":   {"Node", NewNodesUI},
 	}
 	NaviItemsIndex = map[string][]string{
-		"":       {"lustre"},
-		"lustre": {"node"},
+		"": {"node", "lustre"},
+		// "lustre": {"node"},
 	}
 )
 
