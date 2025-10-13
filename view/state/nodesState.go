@@ -12,6 +12,7 @@ import (
 
 	"github.com/luo2pei4/ltool/pkg/dblayer"
 	"github.com/luo2pei4/ltool/pkg/dblayer/repo"
+	logger "github.com/luo2pei4/ltool/pkg/log"
 	"github.com/luo2pei4/ltool/pkg/utils"
 	"gorm.io/gorm"
 )
@@ -395,16 +396,15 @@ func (n *NodesState) detectStatus(ipList []hostnamectlResult) {
 				hnc.status = "online"
 				if pingable {
 					if err := hnc.getHostnamectl(); err != nil {
-						fmt.Printf("get hostnamectl command result failed, %v\n", err)
+						logger.Errorf("get hostnamectl command result failed, %v\n", err)
 					}
-					fmt.Printf("host: %s, user: %s, password: %s, hostname: %s\n", hnc.ipAddress, hnc.user, hnc.password, hnc.hostname)
 					resultCh <- hnc
 				} else {
 					hnc.status = "offline"
 					resultCh <- hnc
 				}
 			} else {
-				fmt.Printf("ping '%s' error, %v\n", hnc.ipAddress, err)
+				logger.Errorf("ping '%s' error, %v\n", hnc.ipAddress, err)
 				hnc.status = "unknown"
 				resultCh <- hnc
 			}

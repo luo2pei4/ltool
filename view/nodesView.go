@@ -9,6 +9,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
+	logger "github.com/luo2pei4/ltool/pkg/log"
 	"github.com/luo2pei4/ltool/pkg/utils"
 	"github.com/luo2pei4/ltool/view/state"
 )
@@ -228,7 +229,7 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 	)
 
 	if err := n.state.LoadAllRecords(); err != nil {
-		fmt.Printf("loading all records failed, %v\n", err)
+		logger.Errorf("loading all records failed, %v\n", err)
 	} else if len(n.state.Records) > 0 {
 		n.records.Refresh()
 		n.updateStatsMsg()
