@@ -68,6 +68,10 @@ func (n *NodesState) LoadAllRecords() error {
 				Password: repoNode.Password,
 				rawPwd:   repoNode.Password,
 				Status:   "unknown",
+				Hostname: repoNode.Hostname,
+				Arch:     repoNode.Architecture,
+				OS:       repoNode.OS,
+				Kernel:   repoNode.Kernel,
 			})
 		}
 	}
@@ -85,6 +89,10 @@ func (n *NodesState) LoadAllRecords() error {
 			n.Records[i].rawUser = repoNode.UserName
 			n.Records[i].Password = repoNode.Password
 			n.Records[i].rawPwd = repoNode.Password
+			n.Records[i].Hostname = repoNode.Hostname
+			n.Records[i].Arch = repoNode.Architecture
+			n.Records[i].OS = repoNode.OS
+			n.Records[i].Kernel = repoNode.Kernel
 		}
 	}
 	pageNodesMap := make(map[string]Node, len(n.Records))
@@ -255,20 +263,28 @@ func (n *NodesState) SaveRecords() error {
 		nowaTime := time.Now().Local()
 		if rec.NewRec {
 			newRepos = append(newRepos, repo.Node{
-				IPAddress:  rec.IP,
-				UserName:   rec.User,
-				Password:   rec.Password,
-				CreateTime: nowaTime,
-				UpdateTime: nowaTime,
+				IPAddress:    rec.IP,
+				UserName:     rec.User,
+				Password:     rec.Password,
+				Hostname:     rec.Hostname,
+				Architecture: rec.Arch,
+				OS:           rec.OS,
+				Kernel:       rec.Kernel,
+				CreateTime:   nowaTime,
+				UpdateTime:   nowaTime,
 			})
 			continue
 		}
 		if rec.Changed {
 			updRepos = append(updRepos, repo.Node{
-				IPAddress:  rec.IP,
-				UserName:   rec.User,
-				Password:   rec.Password,
-				UpdateTime: nowaTime,
+				IPAddress:    rec.IP,
+				UserName:     rec.User,
+				Password:     rec.Password,
+				Hostname:     rec.Hostname,
+				Architecture: rec.Arch,
+				OS:           rec.OS,
+				Kernel:       rec.Kernel,
+				UpdateTime:   nowaTime,
 			})
 		}
 	}
@@ -429,15 +445,19 @@ func (n *NodesState) detectStatus(ipList []hostnamectlResult) {
 			}
 			if hnc.hostname != "" && n.Records[idx].Hostname != hnc.hostname {
 				n.Records[idx].Hostname = hnc.hostname
+				n.Records[idx].Changed = true
 			}
 			if hnc.architecture != "" && n.Records[idx].Arch != hnc.architecture {
 				n.Records[idx].Arch = hnc.architecture
+				n.Records[idx].Changed = true
 			}
 			if hnc.operationSystem != "" && n.Records[idx].OS != hnc.operationSystem {
 				n.Records[idx].OS = hnc.operationSystem
+				n.Records[idx].Changed = true
 			}
 			if hnc.kernel != "" && n.Records[idx].Kernel != hnc.kernel {
 				n.Records[idx].Kernel = strings.TrimPrefix(hnc.kernel, "Linux ")
+				n.Records[idx].Changed = true
 			}
 		}
 	}
