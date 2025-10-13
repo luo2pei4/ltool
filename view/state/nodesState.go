@@ -455,8 +455,9 @@ func (n *NodesState) detectStatus(ipList []hostnamectlResult) {
 				n.Records[idx].OS = hnc.operationSystem
 				n.Records[idx].Changed = true
 			}
-			if hnc.kernel != "" && n.Records[idx].Kernel != hnc.kernel {
-				n.Records[idx].Kernel = strings.TrimPrefix(hnc.kernel, "Linux ")
+			kernel := strings.TrimPrefix(hnc.kernel, "Linux ")
+			if hnc.kernel != "" && n.Records[idx].Kernel != kernel {
+				n.Records[idx].Kernel = kernel
 				n.Records[idx].Changed = true
 			}
 		}
