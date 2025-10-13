@@ -9,7 +9,9 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
+	logger "github.com/luo2pei4/ltool/pkg/log"
 	"github.com/luo2pei4/ltool/pkg/utils"
+	"github.com/luo2pei4/ltool/view/layout"
 	"github.com/luo2pei4/ltool/view/state"
 )
 
@@ -154,8 +156,19 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 			userInput := widget.NewEntry()
 			passInput := widget.NewPasswordEntry()
 			passInput.Password = false
+			passInput.Resize(fyne.NewSize(150, 25))
 			statuscc := container.NewCenter(canvas.NewText("", color.Black))
-			inputArea := container.NewGridWithColumns(4, container.NewStack(bg, ipLabel), userInput, passInput, statuscc)
+			archcc := container.NewCenter(widget.NewLabel(""))
+			kernelcc := container.NewCenter(widget.NewLabel(""))
+			inputArea := container.New(
+				&layout.NodeRecordsGrid{},
+				container.NewStack(bg, ipLabel),
+				userInput,
+				passInput,
+				statuscc,
+				archcc,
+				kernelcc,
+			)
 			row := container.NewBorder(nil, nil, checkbox, nil, inputArea)
 			return row
 		},
@@ -174,7 +187,11 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 			passInput.Password = false
 
 			statuscc := inputArea.Objects[3].(*fyne.Container)
-			ctext := statuscc.Objects[0].(*canvas.Text)
+			statustext := statuscc.Objects[0].(*canvas.Text)
+			archcc := inputArea.Objects[4].(*fyne.Container)
+			archLabel := archcc.Objects[0].(*widget.Label)
+			kernelcc := inputArea.Objects[5].(*fyne.Container)
+			kernelLabel := kernelcc.Objects[0].(*widget.Label)
 
 			node := n.state.GetNodeRecord(id)
 
@@ -206,13 +223,15 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 			}
 			passInput.SetText(node.Password)
 
-			ctext.Text = node.Status
-			ctext.Color = n.state.GetStatusColor(node.Status)
+			statustext.Text = node.Status
+			statustext.Color = n.state.GetStatusColor(node.Status)
+			archLabel.SetText(node.Arch)
+			kernelLabel.SetText(node.Kernel)
 		},
 	)
 
 	if err := n.state.LoadAllRecords(); err != nil {
-		fmt.Printf("loading all records failed, %v\n", err)
+		logger.Errorf("loading all records failed, %v\n", err)
 	} else if len(n.state.Records) > 0 {
 		n.records.Refresh()
 		n.updateStatsMsg()

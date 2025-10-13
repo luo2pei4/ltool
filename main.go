@@ -1,9 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"image/color"
+	"log"
 	"os"
+	"os/user"
+	"path"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -11,6 +13,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/luo2pei4/ltool/pkg/dblayer"
+	logger "github.com/luo2pei4/ltool/pkg/log"
 	"github.com/luo2pei4/ltool/view"
 )
 
@@ -29,9 +32,17 @@ var topWindow fyne.Window
 
 func main() {
 
+	u, err := user.Current()
+	if err != nil {
+		log.Fatalf("get current user failed, %v", err)
+		os.Exit(1)
+	}
+	// init log
+	logger.InitLog("info", path.Join(u.HomeDir, "ltool.log"))
+
 	// init database layer
 	if err := dblayer.Init("sqlite", "./ltool.db"); err != nil {
-		fmt.Printf("initialize database instance failed, %v\n", err)
+		logger.Errorf("initialize database instance failed, %v\n", err)
 		os.Exit(1)
 	}
 

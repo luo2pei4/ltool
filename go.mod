@@ -5,7 +5,9 @@ go 1.25.0
 require (
 	fyne.io/fyne/v2 v2.6.3
 	github.com/prometheus-community/pro-bing v0.7.0
+	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/crypto v0.36.0
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.0
 )
