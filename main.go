@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/user"
+	"path"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -37,7 +38,7 @@ func main() {
 		os.Exit(1)
 	}
 	// init log
-	logger.InitLog("info", u.HomeDir+"ltool.log")
+	logger.InitLog("info", path.Join(u.HomeDir, "ltool.log"))
 
 	// init database layer
 	if err := dblayer.Init("sqlite", "./ltool.db"); err != nil {

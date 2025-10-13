@@ -437,7 +437,7 @@ func (n *NodesState) detectStatus(ipList []hostnamectlResult) {
 				n.Records[idx].OS = hnc.operationSystem
 			}
 			if hnc.kernel != "" && n.Records[idx].Kernel != hnc.kernel {
-				n.Records[idx].Kernel = hnc.kernel
+				n.Records[idx].Kernel = strings.TrimPrefix(hnc.kernel, "Linux ")
 			}
 		}
 	}

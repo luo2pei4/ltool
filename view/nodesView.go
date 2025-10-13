@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	logger "github.com/luo2pei4/ltool/pkg/log"
 	"github.com/luo2pei4/ltool/pkg/utils"
+	"github.com/luo2pei4/ltool/view/layout"
 	"github.com/luo2pei4/ltool/view/state"
 )
 
@@ -159,7 +160,8 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 			statuscc := container.NewCenter(canvas.NewText("", color.Black))
 			archcc := container.NewCenter(widget.NewLabel(""))
 			kernelcc := container.NewCenter(widget.NewLabel(""))
-			inputArea := container.NewGridWithColumns(6,
+			inputArea := container.New(
+				&layout.NodeRecordsGrid{},
 				container.NewStack(bg, ipLabel),
 				userInput,
 				passInput,
