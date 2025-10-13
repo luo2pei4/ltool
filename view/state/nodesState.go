@@ -37,6 +37,17 @@ type NodesState struct {
 	Records []Node
 }
 
+type hostnamectlResult struct {
+	ipAddress       string
+	user            string
+	password        string
+	status          string
+	hostname        string
+	architecture    string
+	operationSystem string
+	kernel          string
+}
+
 func (n *NodesState) LoadAllRecords() error {
 	repoNodes, err := dblayer.DB.ListNodes("")
 	if err != nil {
@@ -283,6 +294,10 @@ func (n *NodesState) GetNodeRecord(id int) Node {
 		User:     n.Records[id].User,
 		Password: n.Records[id].Password,
 		Status:   n.Records[id].Status,
+		Hostname: n.Records[id].Hostname,
+		Arch:     n.Records[id].Arch,
+		OS:       n.Records[id].OS,
+		Kernel:   n.Records[id].Kernel,
 		Checked:  n.Records[id].Checked,
 		NewRec:   n.Records[id].NewRec,
 		Changed:  n.Records[id].Changed,
@@ -349,46 +364,57 @@ func (n *NodesState) GetStatusColor(status string) color.Color {
 }
 
 func (n *NodesState) CheckNodesStatus() {
-	var ipList []string
-	ipList = make([]string, 0, len(n.Records))
+	ipList := make([]hostnamectlResult, 0, len(n.Records))
 	n.RLock()
 	for _, rec := range n.Records {
-		ipList = append(ipList, rec.IP)
+		ipList = append(ipList,
+			hostnamectlResult{
+				ipAddress: rec.IP,
+				user:      rec.User,
+				password:  rec.Password,
+			},
+		)
 	}
 	n.RUnlock()
 	n.detectStatus(ipList)
 }
 
-func (n *NodesState) detectStatus(ipList []string) {
+func (n *NodesState) detectStatus(ipList []hostnamectlResult) {
 	if len(ipList) == 0 {
 		return
 	}
-	resultCh := make(chan string, len(ipList))
+	resultCh := make(chan *hostnamectlResult, len(ipList))
 	defer close(resultCh)
 
 	var wg sync.WaitGroup
-	for _, ip := range ipList {
+	for _, hnc := range ipList {
 		wg.Add(1)
-		go func(ip string) {
+		go func(hnc *hostnamectlResult) {
 			defer wg.Done()
-			if pingable, err := utils.Ping(ip); err == nil {
+			if pingable, err := utils.Ping(hnc.ipAddress); err == nil {
+				hnc.status = "online"
 				if pingable {
-					resultCh <- ip + "-online"
+					if err := hnc.getHostnamectl(); err != nil {
+						fmt.Printf("get hostnamectl command result failed, %v\n", err)
+					}
+					fmt.Printf("host: %s, user: %s, password: %s, hostname: %s\n", hnc.ipAddress, hnc.user, hnc.password, hnc.hostname)
+					resultCh <- hnc
 				} else {
-					resultCh <- ip + "-offline"
+					hnc.status = "offline"
+					resultCh <- hnc
 				}
 			} else {
-				fmt.Printf("ping '%s' error, %v\n", ip, err)
-				resultCh <- ip + "-unknown"
+				fmt.Printf("ping '%s' error, %v\n", hnc.ipAddress, err)
+				hnc.status = "unknown"
+				resultCh <- hnc
 			}
-		}(ip)
+		}(&hnc)
 	}
 	wg.Wait()
 	cnt := 0
-	statusMap := make(map[string]string, len(ipList))
-	for res := range resultCh {
-		arr := strings.Split(res, "-")
-		statusMap[arr[0]] = arr[1]
+	statusMap := make(map[string]*hostnamectlResult, len(ipList))
+	for hnc := range resultCh {
+		statusMap[hnc.ipAddress] = hnc
 		if cnt++; cnt == len(ipList) {
 			break
 		}
@@ -397,25 +423,48 @@ func (n *NodesState) detectStatus(ipList []string) {
 	n.Lock()
 	defer n.Unlock()
 	for idx, rec := range n.Records {
-		if status, ok := statusMap[rec.IP]; ok {
-			if n.Records[idx].Status != status {
-				fmt.Printf("status changed, ip: %s, new status: %s\n", rec.IP, status)
-				n.Records[idx].Status = status
+		if hnc, ok := statusMap[rec.IP]; ok {
+			if n.Records[idx].Status != hnc.status {
+				n.Records[idx].Status = hnc.status
+			}
+			if hnc.hostname != "" && n.Records[idx].Hostname != hnc.hostname {
+				n.Records[idx].Hostname = hnc.hostname
+			}
+			if hnc.architecture != "" && n.Records[idx].Arch != hnc.architecture {
+				n.Records[idx].Arch = hnc.architecture
+			}
+			if hnc.operationSystem != "" && n.Records[idx].OS != hnc.operationSystem {
+				n.Records[idx].OS = hnc.operationSystem
+			}
+			if hnc.kernel != "" && n.Records[idx].Kernel != hnc.kernel {
+				n.Records[idx].Kernel = hnc.kernel
 			}
 		}
 	}
 }
 
-func GetHostnamectl(host, user, password string) *utils.HostnamectlResult {
-	data, err := utils.RemoteCmd(host, user, password, "hostnamectl")
+func (hnc *hostnamectlResult) getHostnamectl() error {
+	data, err := utils.RemoteCmd(hnc.ipAddress, hnc.user, hnc.password, "hostnamectl")
 	if err != nil {
+		return err
+	}
+	if len(data) == 0 {
 		return nil
 	}
-	result, err := utils.ParseHostnamectlResult(data)
-	if err != nil {
-		fmt.Printf("parse hostnamectl result failed, %v\n", err)
-		return nil
+	items := strings.Split(string(data), "\n")
+	for _, item := range items {
+		tmp := strings.TrimSpace(item)
+		switch {
+		case strings.HasPrefix(tmp, "Static hostname"):
+			hnc.hostname = strings.TrimPrefix(tmp, "Static hostname: ")
+		case strings.HasPrefix(tmp, "Operating System"):
+			hnc.operationSystem = strings.TrimPrefix(tmp, "Operating System: ")
+		case strings.HasPrefix(tmp, "Architecture"):
+			hnc.architecture = strings.TrimPrefix(tmp, "Architecture: ")
+		case strings.HasPrefix(tmp, "Kernel"):
+			hnc.kernel = strings.TrimPrefix(tmp, "Kernel: ")
+		default:
+		}
 	}
-	result.IPAddress = host
-	return result
+	return nil
 }
