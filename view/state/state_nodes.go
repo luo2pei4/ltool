@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"image/color"
+	"net"
 	"sort"
 	"strconv"
 	"strings"
@@ -141,7 +142,9 @@ func (n *NodesState) AddNode(ip, user, password string) {
 	// sort records by ip address
 	defer func() {
 		sort.SliceStable(n.Records, func(i, j int) bool {
-			return n.Records[i].IP < n.Records[j].IP
+			ip1 := net.ParseIP(n.Records[i].IP)
+			ip2 := net.ParseIP(n.Records[j].IP)
+			return ipToUint32(ip1) < ipToUint32(ip2)
 		})
 	}()
 
@@ -181,7 +184,7 @@ func (n *NodesState) AddNode(ip, user, password string) {
 		return
 	}
 
-	// to is less than from, switch
+	// if to is less than from
 	if toNodeIP < fromNodeIP {
 		fromNodeIP, toNodeIP = toNodeIP, fromNodeIP
 	}
@@ -488,4 +491,12 @@ func (hnc *hostnamectlResult) getHostnamectl() error {
 		}
 	}
 	return nil
+}
+
+func ipToUint32(ip net.IP) uint32 {
+	ip = ip.To4()
+	if ip == nil {
+		return 0
+	}
+	return uint32(ip[0])<<24 | uint32(ip[1])<<16 | uint32(ip[2])<<8 | uint32(ip[3])
 }
