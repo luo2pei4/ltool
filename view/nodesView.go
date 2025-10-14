@@ -158,7 +158,7 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 			passInput.Password = false
 			passInput.Resize(fyne.NewSize(150, 25))
 			statuscc := container.NewCenter(canvas.NewText("", color.Black))
-			archcc := container.NewCenter(widget.NewLabel(""))
+			hostnamecc := container.NewCenter(widget.NewLabel(""))
 			kernelcc := container.NewCenter(widget.NewLabel(""))
 			inputArea := container.New(
 				&layout.NodeRecordsGrid{},
@@ -166,7 +166,7 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 				userInput,
 				passInput,
 				statuscc,
-				archcc,
+				hostnamecc,
 				kernelcc,
 			)
 			row := container.NewBorder(nil, nil, checkbox, nil, inputArea)
@@ -188,8 +188,8 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 
 			statuscc := inputArea.Objects[3].(*fyne.Container)
 			statustext := statuscc.Objects[0].(*canvas.Text)
-			archcc := inputArea.Objects[4].(*fyne.Container)
-			archLabel := archcc.Objects[0].(*widget.Label)
+			hostnamecc := inputArea.Objects[4].(*fyne.Container)
+			hostnameLabel := hostnamecc.Objects[0].(*widget.Label)
 			kernelcc := inputArea.Objects[5].(*fyne.Container)
 			kernelLabel := kernelcc.Objects[0].(*widget.Label)
 
@@ -225,7 +225,7 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 
 			statustext.Text = node.Status
 			statustext.Color = n.state.GetStatusColor(node.Status)
-			archLabel.SetText(node.Arch)
+			hostnameLabel.SetText(node.Hostname)
 			kernelLabel.SetText(node.Kernel)
 		},
 	)
