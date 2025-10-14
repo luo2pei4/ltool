@@ -1,10 +1,13 @@
 package view
 
 import (
+	"fmt"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	logger "github.com/luo2pei4/ltool/pkg/log"
 	"github.com/luo2pei4/ltool/view/state"
 )
 
@@ -23,7 +26,14 @@ func NewNetMainUI() View {
 
 func (n *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 	n.nodeList = widget.NewSelectEntry([]string{})
-	n.searchBtn = widget.NewButtonWithIcon("", theme.SearchIcon(), func() {})
+	if err := n.state.LoadNodeList(); err == nil {
+		n.nodeList.SetOptions(n.state.NodeList)
+	} else {
+		logger.Errorf("load node list failed, %v\n", err)
+	}
+	n.searchBtn = widget.NewButtonWithIcon("", theme.SearchIcon(), func() {
+		fmt.Printf("select: %s\n", n.nodeList.Text)
+	})
 	inputArea := container.NewGridWithColumns(2, n.nodeList, n.searchBtn)
 	content := container.NewBorder(
 		container.NewVBox(

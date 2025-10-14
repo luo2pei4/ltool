@@ -1,13 +1,16 @@
 package state
 
 import (
+	"errors"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/luo2pei4/ltool/pkg/dblayer"
 	"github.com/luo2pei4/ltool/pkg/utils"
 	"gopkg.in/yaml.v3"
+	"gorm.io/gorm"
 )
 
 type LocalNIS struct {
@@ -37,11 +40,44 @@ type NetInterface struct {
 	IPv6     string
 }
 
+type NetInfo struct {
+	Conn             SSHConnection
+	LnetCtl          LnetCtl
+	NetInterfacesmap map[string]NetInterface // key: interface name
+}
+
 type NetState struct {
 	sync.RWMutex
-	Conn             *SSHConnection
-	LnetCtl          *LnetCtl
-	NetInterfacesmap map[string]map[string]NetInterface // key1: ip address from node info, key2: interface name
+	NodeList []string
+	NodeNet  map[string]NetInfo
+}
+
+func (n *NetState) LoadNodeList() error {
+	repoNodes, err := dblayer.DB.ListNodes("")
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+	n.Lock()
+	defer n.Unlock()
+	if len(repoNodes) == 0 {
+		return nil
+	}
+	n.NodeList = make([]string, 0, len(repoNodes))
+	n.NodeNet = make(map[string]NetInfo, len(repoNodes))
+	for _, repoNode := range repoNodes {
+		n.NodeList = append(n.NodeList, repoNode.IPAddress)
+		n.NodeNet[repoNode.IPAddress] = NetInfo{
+			Conn: SSHConnection{
+				IPAddress: repoNode.IPAddress,
+				User:      repoNode.UserName,
+				Password:  repoNode.Password,
+			},
+		}
+	}
+	return nil
 }
 
 // ipOLinkReg
@@ -61,7 +97,7 @@ type NetState struct {
 var ipOLinkReg = regexp.MustCompile(`^(\d+):\s+([^:]+):\s+<([^>]+)>.*?mtu\s+(\d+)\s+.*?state\s+([A-Z]+).*?\s+(\S+)(?:\s+([0-9a-f:]+))?\s+`)
 
 // exec: lnetctl net show
-func (n *NetState) GetLnetCtlInfo() error {
+func (n *NetInfo) GetLnetCtlInfo() error {
 	data, err := utils.RemoteCmd(n.Conn.IPAddress, n.Conn.User, n.Conn.Password, "lnetctl net show")
 	if err != nil {
 		return err
@@ -70,12 +106,12 @@ func (n *NetState) GetLnetCtlInfo() error {
 	if err := yaml.Unmarshal([]byte(data), &lnetctl); err != nil {
 		return err
 	}
-	n.LnetCtl = &lnetctl
+	n.LnetCtl = lnetctl
 	return nil
 }
 
 // exec: ip -o link show
-func (n *NetState) GetLinkInfo() error {
+func (n *NetInfo) GetLinkInfo() error {
 
 	data, err := utils.RemoteCmd(n.Conn.IPAddress, n.Conn.User, n.Conn.Password, "ip -o link show")
 	if err != nil {

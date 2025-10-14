@@ -20,11 +20,11 @@ var (
 	NaviItems = map[string]Navi{
 		"lustre": {"Lustre", createFirstScreen},
 		"node":   {"Node", NewNodesUI},
-		"lnet":   {"LNet", NewNetMainUI},
+		"net":    {"Net", NewNetMainUI},
 	}
 	NaviItemsIndex = map[string][]string{
 		"":       {"node", "lustre"},
-		"lustre": {"lnet"},
+		"lustre": {"net"},
 	}
 )
 
