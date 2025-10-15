@@ -1,6 +1,7 @@
 package view
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"fyne.io/fyne/v2"
@@ -24,17 +25,35 @@ func NewNetMainUI() View {
 	}
 }
 
-func (n *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
-	n.nodeList = widget.NewSelectEntry([]string{})
-	if err := n.state.LoadNodeList(); err == nil {
-		n.nodeList.SetOptions(n.state.NodeList)
+func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
+	v.nodeList = widget.NewSelectEntry([]string{})
+	if err := v.state.LoadNodeList(); err == nil {
+		v.nodeList.SetOptions(v.state.NodeList)
 	} else {
 		logger.Errorf("load node list failed, %v\n", err)
 	}
-	n.searchBtn = widget.NewButtonWithIcon("", theme.SearchIcon(), func() {
-		fmt.Printf("select: %s\n", n.nodeList.Text)
+	v.searchBtn = widget.NewButtonWithIcon("", theme.SearchIcon(), func() {
+		netInfo, ok := v.state.NodeNet[v.nodeList.Text]
+		if !ok {
+			netInfo = state.NetInfo{}
+		}
+		if err := netInfo.LoadLnetCtlInfo(); err != nil {
+			logger.Errorf("load lnetctl info failed, %v\n", err)
+			return
+		}
+		if err := netInfo.LoadLinkInfo(); err != nil {
+			logger.Errorf("load link info failed, %v\n", err)
+			return
+		}
+		v.state.NodeNet[v.nodeList.Text] = netInfo
+		data, err := json.MarshalIndent(&netInfo, "", "  ")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		fmt.Println(string(data))
 	})
-	inputArea := container.NewGridWithColumns(2, n.nodeList, n.searchBtn)
+	inputArea := container.NewGridWithColumns(2, v.nodeList, v.searchBtn)
 	content := container.NewBorder(
 		container.NewVBox(
 			inputArea,

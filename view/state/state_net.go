@@ -97,7 +97,7 @@ func (n *NetState) LoadNodeList() error {
 var ipOLinkReg = regexp.MustCompile(`^(\d+):\s+([^:]+):\s+<([^>]+)>.*?mtu\s+(\d+)\s+.*?state\s+([A-Z]+).*?\s+(\S+)(?:\s+([0-9a-f:]+))?\s+`)
 
 // exec: lnetctl net show
-func (n *NetInfo) GetLnetCtlInfo() error {
+func (n *NetInfo) LoadLnetCtlInfo() error {
 	data, err := utils.RemoteCmd(n.Conn.IPAddress, n.Conn.User, n.Conn.Password, "lnetctl net show")
 	if err != nil {
 		return err
@@ -111,7 +111,7 @@ func (n *NetInfo) GetLnetCtlInfo() error {
 }
 
 // exec: ip -o link show
-func (n *NetInfo) GetLinkInfo() error {
+func (n *NetInfo) LoadLinkInfo() error {
 
 	data, err := utils.RemoteCmd(n.Conn.IPAddress, n.Conn.User, n.Conn.Password, "ip -o link show")
 	if err != nil {
@@ -160,6 +160,9 @@ func (n *NetInfo) GetLinkInfo() error {
 			LinkType: linkType,
 			MTU:      mtu,
 		}
+	}
+	if len(interfaces) != 0 {
+		n.NetInterfacesmap = interfaces
 	}
 	return nil
 }
