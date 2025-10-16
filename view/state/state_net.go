@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/luo2pei4/ltool/pkg/dblayer"
-	logger "github.com/luo2pei4/ltool/pkg/log"
 	"github.com/luo2pei4/ltool/pkg/utils"
 	"gopkg.in/yaml.v3"
 	"gorm.io/gorm"
@@ -32,12 +31,13 @@ type LnetCtl struct {
 type NetInterface struct {
 	Index    int
 	Name     string
+	IfAlias  string
 	Flags    []string
 	State    string
 	MAC      string
 	MTU      int
 	LinkType string
-	AltName  string
+	AltNames []string
 	IPv4     string
 	IPv6     string
 }
@@ -96,7 +96,7 @@ func (n *NetState) LoadNodeList() error {
 //	.*?mtu\s+(\d+) -> MTU
 //	.*?state\s+([A-Z]+) -> interface State
 //	.*?(?:link/ether\s+([0-9a-f:]+)\s+)? -> MAC address
-var ipOLinkReg = regexp.MustCompile(`^\d+: (\w+): <([^>]+)> mtu (\d+) .* state (\w+) .* link/(\w+) ([^ ]+) (?:altname (\w+))?`)
+// var ipOLinkReg = regexp.MustCompile(`^\d+: (\w+): <([^>]+)> mtu (\d+) .* state (\w+) .* link/(\w+) ([^ ]+) (?:altname (\w+))?`)
 
 // exec: lnetctl net show
 func (n *NetInfo) LoadLnetCtlInfo() error {
@@ -121,39 +121,76 @@ func (n *NetInfo) LoadLinkInfo() error {
 	}
 
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+
+	reLine := regexp.MustCompile(`^(\d+):\s+([^:]+):\s*(.*)$`)
+	reFlags := regexp.MustCompile(`<([^>]*)>`)
+	reMTU := regexp.MustCompile(`\bmtu\s+(\d+)`)
+	reState := regexp.MustCompile(`\bstate\s+([A-Z]+)`)
+	reLink := regexp.MustCompile(`\blink/(\S+)(?:\s+([0-9A-Fa-f:]+))?`)
+	reAltName := regexp.MustCompile(`\baltname\s+(\S+)`)
+
 	interfaces := make(map[string]NetInterface, len(lines))
 
 	for _, line := range lines {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		matches := ipOLinkReg.FindStringSubmatch(line)
-		if len(matches) < 7 {
-			logger.Errorf("failed to parse the input string: %s", line)
+
+		m := reLine.FindStringSubmatch(line)
+		if m == nil {
 			continue
 		}
 
-		// Parse MTU to int
-		mtu, err := strconv.Atoi(matches[3])
-		if err != nil {
-			logger.Errorf("failed to parse MTU: %v", err)
-			continue
+		index, _ := strconv.Atoi(m[1])
+		nameWithAlias := strings.TrimSpace(m[2])
+		rest := m[3]
+
+		name := nameWithAlias
+		ifAlias := ""
+		if at := strings.Index(nameWithAlias, "@"); at >= 0 {
+			name = nameWithAlias[:at]
+			ifAlias = nameWithAlias[at+1:]
 		}
 
-		// Parse flags to slice
-		flags := strings.Split(matches[2], ",")
-		nif := NetInterface{
-			Name:     matches[1],
-			Flags:    flags,
-			MTU:      mtu,
-			State:    matches[4],
-			LinkType: matches[5],
-			MAC:      matches[6],
+		info := NetInterface{
+			Index:   index,
+			Name:    name,
+			IfAlias: ifAlias,
 		}
-		if len(matches) == 8 && matches[7] != "" {
-			nif.AltName = matches[7]
+
+		if fm := reFlags.FindStringSubmatch(rest); fm != nil {
+			flags := strings.Split(strings.TrimSpace(fm[1]), ",")
+			for i := range flags {
+				flags[i] = strings.TrimSpace(flags[i])
+			}
+			info.Flags = flags
 		}
-		interfaces[matches[1]] = nif
+
+		if mm := reMTU.FindStringSubmatch(rest); mm != nil {
+			if mtuVal, err := strconv.Atoi(mm[1]); err == nil {
+				info.MTU = mtuVal
+			}
+		}
+
+		if sm := reState.FindStringSubmatch(rest); sm != nil {
+			info.State = sm[1]
+		}
+
+		if lm := reLink.FindStringSubmatch(rest); lm != nil {
+			info.LinkType = lm[1]
+			if lm[2] != "" {
+				info.MAC = lm[2]
+			}
+		}
+
+		// altname 可能出现多次
+		for _, am := range reAltName.FindAllStringSubmatch(rest, -1) {
+			if len(am) > 1 {
+				info.AltNames = append(info.AltNames, am[1])
+			}
+		}
+
+		interfaces[info.Name] = info
 	}
 	if len(interfaces) != 0 {
 		n.NetInterfacesmap = interfaces
