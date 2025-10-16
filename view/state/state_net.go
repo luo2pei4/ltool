@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/luo2pei4/ltool/pkg/dblayer"
+	logger "github.com/luo2pei4/ltool/pkg/log"
 	"github.com/luo2pei4/ltool/pkg/utils"
 	"gopkg.in/yaml.v3"
 	"gorm.io/gorm"
@@ -36,6 +37,7 @@ type NetInterface struct {
 	MAC      string
 	MTU      int
 	LinkType string
+	AltName  string
 	IPv4     string
 	IPv6     string
 }
@@ -94,7 +96,7 @@ func (n *NetState) LoadNodeList() error {
 //	.*?mtu\s+(\d+) -> MTU
 //	.*?state\s+([A-Z]+) -> interface State
 //	.*?(?:link/ether\s+([0-9a-f:]+)\s+)? -> MAC address
-var ipOLinkReg = regexp.MustCompile(`^(\d+):\s+([^:]+):\s+<([^>]+)>.*?mtu\s+(\d+)\s+.*?state\s+([A-Z]+).*?\s+(\S+)(?:\s+([0-9a-f:]+))?\s+`)
+var ipOLinkReg = regexp.MustCompile(`^\d+: (\w+): <([^>]+)> mtu (\d+) .* state (\w+) .* link/(\w+) ([^ ]+) (?:altname (\w+))?`)
 
 // exec: lnetctl net show
 func (n *NetInfo) LoadLnetCtlInfo() error {
@@ -126,40 +128,32 @@ func (n *NetInfo) LoadLinkInfo() error {
 			continue
 		}
 		matches := ipOLinkReg.FindStringSubmatch(line)
-		if len(matches) < 6 {
+		if len(matches) < 7 {
+			logger.Errorf("failed to parse the input string: %s", line)
 			continue
 		}
-		// index
-		index, _ := strconv.Atoi(matches[1])
-		// name
-		name := matches[2]
-		// flags
-		flagsStr := matches[3]
-		flags := strings.Split(flagsStr, ",")
-		// mtu
-		mtu, _ := strconv.Atoi(matches[4])
-		// state
-		state := matches[5]
-		// link type
-		linkType := matches[6]
-		// mac address
-		macAddr := ""
-		if len(matches) > 7 && matches[7] != "" {
-			macAddr = matches[7]
-		} else if strings.HasPrefix(linkType, "loopback") {
-			macAddr = "N/A"
-		} else if strings.HasSuffix(linkType, "none") {
-			macAddr = "N/A"
+
+		// Parse MTU to int
+		mtu, err := strconv.Atoi(matches[3])
+		if err != nil {
+			logger.Errorf("failed to parse MTU: %v", err)
+			continue
 		}
-		interfaces[name] = NetInterface{
-			Index:    index,
-			Name:     name,
+
+		// Parse flags to slice
+		flags := strings.Split(matches[2], ",")
+		nif := NetInterface{
+			Name:     matches[1],
 			Flags:    flags,
-			State:    state,
-			MAC:      macAddr,
-			LinkType: linkType,
 			MTU:      mtu,
+			State:    matches[4],
+			LinkType: matches[5],
+			MAC:      matches[6],
 		}
+		if len(matches) == 8 && matches[7] != "" {
+			nif.AltName = matches[7]
+		}
+		interfaces[matches[1]] = nif
 	}
 	if len(interfaces) != 0 {
 		n.NetInterfacesmap = interfaces
