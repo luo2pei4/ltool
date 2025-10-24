@@ -57,7 +57,7 @@ func main() {
 
 	content := container.NewBorder(nil, nil, nil, nil, page)
 	split := container.NewHSplit(makeNav(setContent), content)
-	split.Offset = 0.2
+	split.Offset = 0.15
 	topWindow.SetContent(split)
 
 	topWindow.Resize(fyne.NewSize(1024, 768))
@@ -94,7 +94,8 @@ func makeNav(setContent func(v view.Navi)) fyne.CanvasObject {
 		},
 	}
 
-	themes := container.NewGridWithColumns(2,
+	themes := container.NewGridWithColumns(
+		2,
 		widget.NewButton("Dark", func() {
 			a.Settings().SetTheme(&forcedVariant{Theme: theme.DefaultTheme(), variant: theme.VariantDark})
 		}),
