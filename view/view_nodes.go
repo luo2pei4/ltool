@@ -111,7 +111,7 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 			}, w,
 		)
 	})
-	n.statusBtn = widget.NewButton("Status", func() {
+	n.statusBtn = widget.NewButton("Check", func() {
 		popup := showProgressing(w, "Checking, please wait...", 400)
 		go func() {
 			n.state.CheckNodesStatus()
@@ -169,8 +169,7 @@ func (n *NodesUI) CreateView(w fyne.Window) fyne.CanvasObject {
 				hostnamecc,
 				kernelcc,
 			)
-			row := container.NewBorder(nil, nil, checkbox, nil, inputArea)
-			return row
+			return container.NewBorder(nil, nil, checkbox, nil, inputArea)
 		},
 		func(id widget.ListItemID, obj fyne.CanvasObject) {
 

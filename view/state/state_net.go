@@ -3,6 +3,7 @@ package state
 import (
 	"errors"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -45,7 +46,7 @@ type NetInterface struct {
 type NetInfo struct {
 	Conn             SSHConnection
 	LnetCtl          LnetCtl
-	NetInterfacesmap map[string]NetInterface // key: interface name
+	NetInterfacesMap map[string]NetInterface // key: interface name
 }
 
 type NetState struct {
@@ -193,7 +194,24 @@ func (n *NetInfo) LoadLinkInfo() error {
 		interfaces[info.Name] = info
 	}
 	if len(interfaces) != 0 {
-		n.NetInterfacesmap = interfaces
+		n.NetInterfacesMap = interfaces
 	}
 	return nil
+}
+
+func (n *NetState) GetNetInterfaceRecord(nodeIP string, id int) *NetInterface {
+	n.RLock()
+	defer n.RUnlock()
+	nodeNet, ok := n.NodeNet[nodeIP]
+	if !ok {
+		return nil
+	}
+	interfaceList := make([]*NetInterface, 0, len(nodeNet.NetInterfacesMap))
+	for _, info := range nodeNet.NetInterfacesMap {
+		interfaceList = append(interfaceList, &info)
+	}
+	sort.SliceStable(interfaceList, func(i, j int) bool {
+		return interfaceList[i].Name < interfaceList[j].Name
+	})
+	return interfaceList[id]
 }

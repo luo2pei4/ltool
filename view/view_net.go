@@ -19,7 +19,7 @@ type NetMainUI struct {
 	state     *state.NetState
 	nodeList  *widget.SelectEntry
 	searchBtn *widget.Button
-	// records  *widget.List
+	records   *widget.List
 }
 
 func NewNetMainUI() View {
@@ -35,6 +35,25 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 	} else {
 		logger.Errorf("load node list failed, %v\n", err)
 	}
+	v.records = widget.NewList(
+		func() int {
+			if netInfo, ok := v.state.NodeNet[v.nodeList.Text]; ok {
+				return len(netInfo.NetInterfacesMap)
+			}
+			return 0
+		},
+		func() fyne.CanvasObject {
+			adapterLabel := widget.NewLabel("")
+			return container.NewBorder(nil, nil, adapterLabel, nil, nil)
+		},
+		func(id widget.ListItemID, obj fyne.CanvasObject) {
+			row := obj.(*fyne.Container)
+			adapterLabel := row.Objects[1].(*widget.Label)
+			if netInfo := v.state.GetNetInterfaceRecord(v.nodeList.Text, id); netInfo != nil {
+				adapterLabel.SetText(netInfo.Name)
+			}
+		},
+	)
 	v.searchBtn = widget.NewButtonWithIcon("", theme.SearchIcon(), func() {
 		popup := showProgressing(w, "Searching, please wait...", 400)
 		go func() {
@@ -77,10 +96,10 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 			inputArea,
 			widget.NewSeparator(),
 		),
-		nil, // bottom
-		nil, // left
-		nil, // right
-		nil, // fill content space
+		nil,       // bottom
+		nil,       // left
+		nil,       // right
+		v.records, // fill content space
 	)
 	return content
 }
