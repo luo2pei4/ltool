@@ -152,6 +152,9 @@ func (n *NetInfo) LoadLinkInfo() error {
 			name = nameWithAlias[:at]
 			ifAlias = nameWithAlias[at+1:]
 		}
+		if name == "lo" {
+			continue
+		}
 
 		info := NetInterface{
 			Index:   index,
@@ -184,7 +187,7 @@ func (n *NetInfo) LoadLinkInfo() error {
 			}
 		}
 
-		// altname 可能出现多次
+		// multiple altname
 		for _, am := range reAltName.FindAllStringSubmatch(rest, -1) {
 			if len(am) > 1 {
 				info.AltNames = append(info.AltNames, am[1])
@@ -193,6 +196,55 @@ func (n *NetInfo) LoadLinkInfo() error {
 
 		interfaces[info.Name] = info
 	}
+	// ip addresses
+	data, err = utils.RemoteCmd(n.Conn.IPAddress, n.Conn.User, n.Conn.Password, "ip -o address show")
+	if err != nil {
+		return err
+	}
+	lines = strings.Split(strings.TrimSpace(string(data)), "\n")
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) < 4 {
+			continue
+		}
+		// fields[0]: serial，example "2:"
+		// fields[1]: adapter name，example "eth0"
+		// fields[2]: protocal，"inet" or "inet6"
+		// fields[3]: IP/mask，exampl "192.168.1.100/24" or "fe80::1/64"
+
+		ifName := fields[1]
+		family := fields[2]
+		ipWithMask := fields[3]
+
+		// split IP and mask
+		ip := strings.Split(ipWithMask, "/")[0]
+
+		// filt loopback and invalid address
+		if ifName == "lo" {
+			continue
+		}
+		if ip == "" {
+			continue
+		}
+
+		iinfo, ok := interfaces[ifName]
+		if !ok {
+			continue
+		}
+
+		if family == "inet" {
+			iinfo.IPv4 = ip
+		} else if family == "inet6" {
+			if strings.HasPrefix(ip, "fe80:") {
+				continue
+			}
+			iinfo.IPv6 = ip
+		} else {
+			continue
+		}
+		interfaces[ifName] = iinfo
+	}
+
 	if len(interfaces) != 0 {
 		n.NetInterfacesMap = interfaces
 	}

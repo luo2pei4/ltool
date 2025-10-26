@@ -1,8 +1,6 @@
 package view
 
 import (
-	"encoding/json"
-	"fmt"
 	"image/color"
 
 	"fyne.io/fyne/v2"
@@ -43,14 +41,37 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 			return 0
 		},
 		func() fyne.CanvasObject {
+
 			adapterLabel := widget.NewLabel("")
-			return container.NewBorder(nil, nil, adapterLabel, nil, nil)
+			adapterLabel.Selectable = true
+
+			ipLabel := widget.NewLabel("")
+			ipLabel.Selectable = true
+
+			macLabel := widget.NewLabel("")
+			macLabel.Selectable = true
+
+			linkTypeLabel := widget.NewLabel("")
+			linkTypeLabel.Selectable = true
+
+			stateLabel := widget.NewLabel("")
+			stateLabel.Selectable = true
+
+			return container.NewHBox(adapterLabel, ipLabel, macLabel, linkTypeLabel, stateLabel)
 		},
 		func(id widget.ListItemID, obj fyne.CanvasObject) {
 			row := obj.(*fyne.Container)
-			adapterLabel := row.Objects[1].(*widget.Label)
+			adapterLabel := row.Objects[0].(*widget.Label)
+			ipLabel := row.Objects[1].(*widget.Label)
+			macLabel := row.Objects[2].(*widget.Label)
+			linkTypeLabel := row.Objects[3].(*widget.Label)
+			stateLabel := row.Objects[4].(*widget.Label)
 			if netInfo := v.state.GetNetInterfaceRecord(v.nodeList.Text, id); netInfo != nil {
 				adapterLabel.SetText(netInfo.Name)
+				ipLabel.SetText(netInfo.IPv4)
+				macLabel.SetText(netInfo.MAC)
+				linkTypeLabel.SetText(netInfo.LinkType)
+				stateLabel.SetText(netInfo.State)
 			}
 		},
 	)
@@ -71,9 +92,6 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 				}
 			}
 			v.state.NodeNet[v.nodeList.Text] = netInfo
-			if data, err := json.MarshalIndent(&netInfo, "", "  "); err == nil {
-				fmt.Println(string(data))
-			}
 			fyne.Do(func() {
 				if popup != nil {
 					popup.Hide()
@@ -86,7 +104,9 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 					bg.SetMinSize(fyne.NewSize(400, 160))
 					content := container.NewStack(bg, container.NewVBox(errLabel))
 					dialog.ShowCustom("Error", "Close", content, w)
+					return
 				}
+				v.records.Refresh()
 			})
 		}()
 	})
