@@ -70,8 +70,12 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 				stateLabel,
 				lnetLabel,
 			)
-
-			return container.NewBorder(nil, nil, nil, nil, recordArea)
+			editBtn := widget.NewButtonWithIcon("", theme.DocumentCreateIcon(), func() {
+				f := dialog.NewForm("Net Config", "Save", "Cancel", nil, func(b bool) {}, w)
+				f.Resize(fyne.NewSize(300, 150)) // 可选：控制对话框大小
+				f.Show()
+			})
+			return container.NewBorder(nil, nil, nil, editBtn, recordArea)
 		},
 		func(id widget.ListItemID, obj fyne.CanvasObject) {
 			row := obj.(*fyne.Container)
@@ -91,8 +95,6 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 				stateLabel.SetText(netInfo.State)
 				if nid, ok := lnetMap[netInfo.Name]; ok {
 					lnetLabel.SetText(nid)
-				} else {
-					lnetLabel.SetText("")
 				}
 			}
 		},
