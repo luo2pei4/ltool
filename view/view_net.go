@@ -10,6 +10,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	logger "github.com/luo2pei4/ltool/pkg/log"
+	"github.com/luo2pei4/ltool/view/layout"
 	"github.com/luo2pei4/ltool/view/state"
 )
 
@@ -60,16 +61,27 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 			lnetLabel := widget.NewLabel("")
 			lnetLabel.Selectable = true
 
-			return container.NewHBox(adapterLabel, ipLabel, macLabel, linkTypeLabel, stateLabel, lnetLabel)
+			recordArea := container.New(
+				&layout.NetRecordsGrid{},
+				adapterLabel,
+				ipLabel,
+				macLabel,
+				linkTypeLabel,
+				stateLabel,
+				lnetLabel,
+			)
+
+			return container.NewBorder(nil, nil, nil, nil, recordArea)
 		},
 		func(id widget.ListItemID, obj fyne.CanvasObject) {
 			row := obj.(*fyne.Container)
-			adapterLabel := row.Objects[0].(*widget.Label)
-			ipLabel := row.Objects[1].(*widget.Label)
-			macLabel := row.Objects[2].(*widget.Label)
-			linkTypeLabel := row.Objects[3].(*widget.Label)
-			stateLabel := row.Objects[4].(*widget.Label)
-			lnetLabel := row.Objects[5].(*widget.Label)
+			recordArea := row.Objects[0].(*fyne.Container)
+			adapterLabel := recordArea.Objects[0].(*widget.Label)
+			ipLabel := recordArea.Objects[1].(*widget.Label)
+			macLabel := recordArea.Objects[2].(*widget.Label)
+			linkTypeLabel := recordArea.Objects[3].(*widget.Label)
+			stateLabel := recordArea.Objects[4].(*widget.Label)
+			lnetLabel := recordArea.Objects[5].(*widget.Label)
 			netInfo, lnetMap := v.state.GetNetInterfaceRecord(v.nodeList.Text, id)
 			if netInfo != nil {
 				adapterLabel.SetText(netInfo.Name)
@@ -79,6 +91,8 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 				stateLabel.SetText(netInfo.State)
 				if nid, ok := lnetMap[netInfo.Name]; ok {
 					lnetLabel.SetText(nid)
+				} else {
+					lnetLabel.SetText("")
 				}
 			}
 		},
