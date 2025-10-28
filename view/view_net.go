@@ -57,7 +57,10 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 			stateLabel := widget.NewLabel("")
 			stateLabel.Selectable = true
 
-			return container.NewHBox(adapterLabel, ipLabel, macLabel, linkTypeLabel, stateLabel)
+			lnetLabel := widget.NewLabel("")
+			lnetLabel.Selectable = true
+
+			return container.NewHBox(adapterLabel, ipLabel, macLabel, linkTypeLabel, stateLabel, lnetLabel)
 		},
 		func(id widget.ListItemID, obj fyne.CanvasObject) {
 			row := obj.(*fyne.Container)
@@ -66,12 +69,17 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 			macLabel := row.Objects[2].(*widget.Label)
 			linkTypeLabel := row.Objects[3].(*widget.Label)
 			stateLabel := row.Objects[4].(*widget.Label)
-			if netInfo := v.state.GetNetInterfaceRecord(v.nodeList.Text, id); netInfo != nil {
+			lnetLabel := row.Objects[5].(*widget.Label)
+			netInfo, lnetMap := v.state.GetNetInterfaceRecord(v.nodeList.Text, id)
+			if netInfo != nil {
 				adapterLabel.SetText(netInfo.Name)
 				ipLabel.SetText(netInfo.IPv4)
 				macLabel.SetText(netInfo.MAC)
 				linkTypeLabel.SetText(netInfo.LinkType)
 				stateLabel.SetText(netInfo.State)
+				if nid, ok := lnetMap[netInfo.Name]; ok {
+					lnetLabel.SetText(nid)
+				}
 			}
 		},
 	)
