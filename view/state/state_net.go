@@ -251,12 +251,12 @@ func (n *NetInfo) LoadLinkInfo() error {
 	return nil
 }
 
-func (n *NetState) GetNetInterfaceRecord(nodeIP string, id int) *NetInterface {
+func (n *NetState) GetNetInterfaceRecord(nodeIP string, id int) (*NetInterface, map[string]string) {
 	n.RLock()
 	defer n.RUnlock()
 	nodeNet, ok := n.NodeNet[nodeIP]
 	if !ok {
-		return nil
+		return nil, nil
 	}
 	interfaceList := make([]*NetInterface, 0, len(nodeNet.NetInterfacesMap))
 	for _, info := range nodeNet.NetInterfacesMap {
@@ -265,5 +265,20 @@ func (n *NetState) GetNetInterfaceRecord(nodeIP string, id int) *NetInterface {
 	sort.SliceStable(interfaceList, func(i, j int) bool {
 		return interfaceList[i].Name < interfaceList[j].Name
 	})
-	return interfaceList[id]
+
+	if len(nodeNet.LnetCtl.Net) == 0 {
+		return interfaceList[id], nil
+	}
+
+	// lnet info
+	lnetMap := make(map[string]string) // key: interface name, value: nid
+	for _, net := range nodeNet.LnetCtl.Net {
+		for _, ni := range net.LocalNIs {
+			for _, iname := range ni.Interfaces {
+				lnetMap[iname] = ni.NID
+			}
+		}
+	}
+
+	return interfaceList[id], lnetMap
 }
