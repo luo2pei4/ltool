@@ -2,6 +2,8 @@ package view
 
 import (
 	"image/color"
+	"strconv"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -107,8 +109,13 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 			}
 			editBtn := row.Objects[1].(*widget.Button)
 			editBtn.OnTapped = func() {
-				f := dialog.NewForm("Net Config", "Save", "Cancel", nil, func(b bool) {}, w)
-				f.Resize(fyne.NewSize(800, 600))
+				f := dialog.NewForm(
+					"Net Config",
+					"Save", "Cancel",
+					makeNetConfigFormItems(netInfo, lnetMap),
+					func(b bool) {},
+					w)
+				f.Resize(fyne.NewSize(350, 500))
 				f.Show()
 			}
 		},
@@ -165,6 +172,13 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 }
 
 func makeNetConfigFormItems(netInfo *state.NetInterface, lnetMap map[string]string) []*widget.FormItem {
-
-	return nil
+	items := make([]*widget.FormItem, 0)
+	items = append(items, widget.NewFormItem("Interface", widget.NewLabel(netInfo.Name)))
+	items = append(items, widget.NewFormItem("Alt names", widget.NewLabel(strings.Join(netInfo.AltNames, ","))))
+	items = append(items, widget.NewFormItem("IP address", &widget.Entry{Text: netInfo.IPv4, MultiLine: false}))
+	items = append(items, widget.NewFormItem("Mac address", widget.NewLabel(netInfo.MAC)))
+	items = append(items, widget.NewFormItem("Flags", widget.NewLabel(strings.Join(netInfo.Flags, ","))))
+	items = append(items, widget.NewFormItem("MTU", widget.NewLabel(strconv.Itoa(netInfo.MTU))))
+	items = append(items, widget.NewFormItem("NID", &widget.Entry{Text: lnetMap[netInfo.Name], MultiLine: false}))
+	return items
 }
