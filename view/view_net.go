@@ -18,6 +18,7 @@ type NetMainUI struct {
 	state     *state.NetState
 	nodeList  *widget.SelectEntry
 	searchBtn *widget.Button
+	header    *fyne.Container
 	records   *widget.List
 }
 
@@ -34,6 +35,17 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 	} else {
 		logger.Errorf("load node list failed, %v\n", err)
 	}
+	v.header = container.New(
+		&layout.NetRecordsGrid{},
+		widget.NewLabel("Interface"),
+		widget.NewLabel("IP Address"),
+		widget.NewLabel("Mac"),
+		widget.NewLabel("Link Type"),
+		widget.NewLabel("State"),
+		widget.NewLabel("NID"),
+	)
+	v.header.Hide()
+
 	v.records = widget.NewList(
 		func() int {
 			if netInfo, ok := v.state.NodeNet[v.nodeList.Text]; ok {
@@ -130,6 +142,7 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 					dialog.ShowCustom("Error", "Close", content, w)
 					return
 				}
+				v.header.Show()
 				v.records.Refresh()
 			})
 		}()
@@ -139,6 +152,7 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 		container.NewVBox(
 			inputArea,
 			widget.NewSeparator(),
+			v.header,
 		),
 		nil,       // bottom
 		nil,       // left
