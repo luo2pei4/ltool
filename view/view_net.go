@@ -201,7 +201,7 @@ func makeNetConfigFormItems(netInfo *state.NetInterface, lnetMap map[string]stri
 	idxEntry := widget.Entry{Text: idx, MultiLine: false}
 	ntSelect := widget.NewSelectEntry([]string{"tcp", "o2ib"})
 	ntSelect.Text = netType
-	nidArea := container.NewGridWithColumns(3, &ipEntry, ntSelect, &idxEntry)
+	nidArea := container.New(&layout.NIDAreaGrid{}, &ipEntry, ntSelect, &idxEntry)
 	items = append(items, widget.NewFormItem("NID", nidArea))
 	return items
 }
