@@ -112,7 +112,7 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 				f := dialog.NewForm(
 					"Net Config",
 					"Save", "Cancel",
-					makeNetConfigFormItems(netInfo, lnetMap),
+					makeNetConfigFormItems(v.nodeList.Text, netInfo, lnetMap),
 					func(b bool) {},
 					w)
 				f.Resize(fyne.NewSize(350, 500))
@@ -171,11 +171,15 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 	return content
 }
 
-func makeNetConfigFormItems(netInfo *state.NetInterface, lnetMap map[string]string) []*widget.FormItem {
+func makeNetConfigFormItems(manageIP string, netInfo *state.NetInterface, lnetMap map[string]string) []*widget.FormItem {
 	items := make([]*widget.FormItem, 0)
 	items = append(items, widget.NewFormItem("Interface", widget.NewLabel(netInfo.Name)))
 	items = append(items, widget.NewFormItem("Alt names", widget.NewLabel(strings.Join(netInfo.AltNames, ","))))
-	items = append(items, widget.NewFormItem("IP address", &widget.Entry{Text: netInfo.IPv4, MultiLine: false}))
+	if netInfo.IPv4 == manageIP {
+		items = append(items, widget.NewFormItem("IP address", widget.NewLabel(manageIP)))
+	} else {
+		items = append(items, widget.NewFormItem("IP address", &widget.Entry{Text: netInfo.IPv4, MultiLine: false}))
+	}
 	items = append(items, widget.NewFormItem("Mac address", widget.NewLabel(netInfo.MAC)))
 	items = append(items, widget.NewFormItem("State", widget.NewLabel(netInfo.State)))
 	items = append(items, widget.NewFormItem("Flags", widget.NewLabel(strings.Join(netInfo.Flags, ","))))
