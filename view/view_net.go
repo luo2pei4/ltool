@@ -177,8 +177,31 @@ func makeNetConfigFormItems(netInfo *state.NetInterface, lnetMap map[string]stri
 	items = append(items, widget.NewFormItem("Alt names", widget.NewLabel(strings.Join(netInfo.AltNames, ","))))
 	items = append(items, widget.NewFormItem("IP address", &widget.Entry{Text: netInfo.IPv4, MultiLine: false}))
 	items = append(items, widget.NewFormItem("Mac address", widget.NewLabel(netInfo.MAC)))
+	items = append(items, widget.NewFormItem("State", widget.NewLabel(netInfo.State)))
 	items = append(items, widget.NewFormItem("Flags", widget.NewLabel(strings.Join(netInfo.Flags, ","))))
 	items = append(items, widget.NewFormItem("MTU", widget.NewLabel(strconv.Itoa(netInfo.MTU))))
-	items = append(items, widget.NewFormItem("NID", &widget.Entry{Text: lnetMap[netInfo.Name], MultiLine: false}))
+	nid := lnetMap[netInfo.Name]
+	var (
+		ip      string
+		netType string
+		idx     string
+	)
+	if len(nid) != 0 {
+		arr := strings.Split(nid, "@")
+		ip = arr[0]
+		if strings.HasPrefix(arr[1], "tcp") {
+			netType = "tcp"
+			idx = strings.TrimPrefix(arr[1], "tcp")
+		} else if strings.HasPrefix(arr[1], "o2ib") {
+			netType = "o2ib"
+			idx = strings.TrimPrefix(arr[1], "o2ib")
+		}
+	}
+	ipEntry := widget.Entry{Text: ip, MultiLine: false}
+	idxEntry := widget.Entry{Text: idx, MultiLine: false}
+	ntSelect := widget.NewSelectEntry([]string{"tcp", "o2ib"})
+	ntSelect.Text = netType
+	nidArea := container.NewGridWithColumns(3, &ipEntry, ntSelect, &idxEntry)
+	items = append(items, widget.NewFormItem("NID", nidArea))
 	return items
 }
