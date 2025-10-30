@@ -69,8 +69,8 @@ type NetInfo struct {
 type NetState struct {
 	sync.RWMutex
 	NodeList []string
-	NodeNet  map[string]NetInfo
-	Detail   NetDetail
+	SSHCon   map[string]SSHConnection
+	Details  []NetDetail
 }
 
 func (n *NetState) LoadNodeList() error {
@@ -87,15 +87,13 @@ func (n *NetState) LoadNodeList() error {
 		return nil
 	}
 	n.NodeList = make([]string, 0, len(repoNodes))
-	n.NodeNet = make(map[string]NetInfo, len(repoNodes))
+	n.SSHCon = make(map[string]SSHConnection, len(repoNodes))
 	for _, repoNode := range repoNodes {
 		n.NodeList = append(n.NodeList, repoNode.IPAddress)
-		n.NodeNet[repoNode.IPAddress] = NetInfo{
-			Conn: SSHConnection{
-				IPAddress: repoNode.IPAddress,
-				User:      repoNode.UserName,
-				Password:  repoNode.Password,
-			},
+		n.SSHCon[repoNode.IPAddress] = SSHConnection{
+			IPAddress: repoNode.IPAddress,
+			User:      repoNode.UserName,
+			Password:  repoNode.Password,
 		}
 	}
 	return nil
@@ -118,25 +116,24 @@ func (n *NetState) LoadNodeList() error {
 // var ipOLinkReg = regexp.MustCompile(`^\d+: (\w+): <([^>]+)> mtu (\d+) .* state (\w+) .* link/(\w+) ([^ ]+) (?:altname (\w+))?`)
 
 // exec: lnetctl net show
-func (n *NetInfo) LoadLnetCtlInfo() error {
-	data, err := utils.RemoteCmd(n.Conn.IPAddress, n.Conn.User, n.Conn.Password, "lnetctl net show")
+func loadLnetCtlInfo(ip, user, pwd string) (*LnetCtl, error) {
+	data, err := utils.RemoteCmd(ip, user, pwd, "lnetctl net show")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var lnetctl LnetCtl
 	if err := yaml.Unmarshal([]byte(data), &lnetctl); err != nil {
-		return err
+		return nil, err
 	}
-	n.LnetCtl = lnetctl
-	return nil
+	return &lnetctl, nil
 }
 
-// exec: ip -o link show
-func (n *NetInfo) LoadLinkInfo() error {
+// exec: ip -o link show / ip -o address show
+func loadLinkInfo(ip, user, pwd string) (map[string]NetInterface, error) {
 
-	data, err := utils.RemoteCmd(n.Conn.IPAddress, n.Conn.User, n.Conn.Password, "ip -o link show")
+	data, err := utils.RemoteCmd(ip, user, pwd, "ip -o link show")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
@@ -215,9 +212,9 @@ func (n *NetInfo) LoadLinkInfo() error {
 		interfaces[info.Name] = info
 	}
 	// ip addresses
-	data, err = utils.RemoteCmd(n.Conn.IPAddress, n.Conn.User, n.Conn.Password, "ip -o address show")
+	data, err = utils.RemoteCmd(ip, user, pwd, "ip -o address show")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	lines = strings.Split(strings.TrimSpace(string(data)), "\n")
 	for _, line := range lines {
@@ -262,55 +259,60 @@ func (n *NetInfo) LoadLinkInfo() error {
 		}
 		interfaces[ifName] = iinfo
 	}
-
-	if len(interfaces) != 0 {
-		n.NetInterfacesMap = interfaces
-	}
-	return nil
+	return interfaces, nil
 }
 
-func (n *NetState) LoadInterfaceDetail(nodeIP string, id int) {
+func (n *NetState) LoadInterfaceDetail(ip, user, pwd string) error {
 
 	n.RLock()
 	defer n.RUnlock()
 
-	nodeNet := n.NodeNet[nodeIP]
-	interfaceList := make([]*NetInterface, 0, len(nodeNet.NetInterfacesMap))
-	for _, info := range nodeNet.NetInterfacesMap {
-		interfaceList = append(interfaceList, &info)
+	ifMap, err := loadLinkInfo(ip, user, pwd)
+	if err != nil {
+		return err
 	}
-	sort.SliceStable(interfaceList, func(i, j int) bool {
-		return interfaceList[i].Name < interfaceList[j].Name
+	details := make([]NetDetail, 0, len(ifMap))
+	for _, info := range ifMap {
+		details = append(details, NetDetail{
+			Name:     info.Name,
+			IfAlias:  info.IfAlias,
+			Flags:    strings.Join(info.Flags, ","),
+			State:    info.State,
+			MAC:      info.MAC,
+			MTU:      info.MTU,
+			LinkType: info.LinkType,
+			AltNames: strings.Join(info.AltNames, ","),
+			IPv4:     info.IPv4,
+			IPv6:     info.IPv6,
+		})
+	}
+	sort.SliceStable(details, func(i, j int) bool {
+		return details[i].Name < details[j].Name
 	})
+	n.Details = details
 
-	n.Detail.Name = interfaceList[id].Name
-	n.Detail.IfAlias = interfaceList[id].IfAlias
-	n.Detail.Flags = strings.Join(interfaceList[id].Flags, ",")
-	n.Detail.State = interfaceList[id].State
-	n.Detail.MAC = interfaceList[id].MAC
-	n.Detail.MTU = interfaceList[id].MTU
-	n.Detail.LinkType = interfaceList[id].LinkType
-	n.Detail.AltNames = strings.Join(interfaceList[id].AltNames, ",")
-	n.Detail.IPv4 = interfaceList[id].IPv4
-	n.Detail.IPv6 = interfaceList[id].IPv6
-
-	if len(nodeNet.LnetCtl.Net) == 0 {
-		return
+	lnetInfo, err := loadLnetCtlInfo(ip, user, pwd)
+	if err != nil {
+		return err
+	}
+	if len(lnetInfo.Net) == 0 {
+		return nil
 	}
 
-	name := interfaceList[id].Name
-	nid := ""
-	for _, net := range nodeNet.LnetCtl.Net {
+	nidMap := make(map[string]string)
+	for _, net := range lnetInfo.Net {
 		for _, ni := range net.LocalNIs {
 			for _, iname := range ni.Interfaces {
-				if iname == name {
-					nid = ni.NID
-				}
+				nidMap[iname] = ni.NID
 			}
 		}
 	}
-	n.Detail.NID = nid
-	if len(nid) != 0 {
+	for i, detail := range details {
+		nid, ok := nidMap[detail.Name]
+		if !ok {
+			continue
+		}
+		details[i].NID = nid
 		arr := strings.Split(nid, "@")
 		netType := ""
 		idx := ""
@@ -321,12 +323,10 @@ func (n *NetState) LoadInterfaceDetail(nodeIP string, id int) {
 			netType = "o2ib"
 			idx = strings.TrimPrefix(arr[1], "o2ib")
 		}
-		n.Detail.NIDIP = arr[0]
-		n.Detail.NetType = netType
-		n.Detail.SuffixIdx = idx
-	} else {
-		n.Detail.NIDIP = ""
-		n.Detail.NetType = ""
-		n.Detail.SuffixIdx = ""
+		details[i].NIDIP = arr[0]
+		details[i].NetType = netType
+		details[i].SuffixIdx = idx
 	}
+	n.Details = details
+	return nil
 }

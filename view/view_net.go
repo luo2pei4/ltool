@@ -49,10 +49,7 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 
 	v.records = widget.NewList(
 		func() int {
-			if netInfo, ok := v.state.NodeNet[v.nodeList.Text]; ok {
-				return len(netInfo.NetInterfacesMap)
-			}
-			return 0
+			return len(v.state.Details)
 		},
 		func() fyne.CanvasObject {
 
@@ -87,6 +84,9 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 			return container.NewBorder(nil, nil, nil, editBtn, recordArea)
 		},
 		func(id widget.ListItemID, obj fyne.CanvasObject) {
+
+			detail := &v.state.Details[id]
+
 			row := obj.(*fyne.Container)
 			recordArea := row.Objects[0].(*fyne.Container)
 			adapterLabel := recordArea.Objects[0].(*widget.Label)
@@ -95,21 +95,20 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 			linkTypeLabel := recordArea.Objects[3].(*widget.Label)
 			stateLabel := recordArea.Objects[4].(*widget.Label)
 			lnetLabel := recordArea.Objects[5].(*widget.Label)
-			v.state.LoadInterfaceDetail(v.nodeList.Text, id)
 
-			adapterLabel.SetText(v.state.Detail.Name)
-			ipLabel.SetText(v.state.Detail.IPv4)
-			macLabel.SetText(v.state.Detail.MAC)
-			linkTypeLabel.SetText(v.state.Detail.LinkType)
-			stateLabel.SetText(v.state.Detail.State)
-			lnetLabel.SetText(v.state.Detail.NID)
+			adapterLabel.SetText(detail.Name)
+			ipLabel.SetText(detail.IPv4)
+			macLabel.SetText(detail.MAC)
+			linkTypeLabel.SetText(detail.LinkType)
+			stateLabel.SetText(detail.State)
+			lnetLabel.SetText(detail.NID)
 
 			editBtn := row.Objects[1].(*widget.Button)
 			editBtn.OnTapped = func() {
 				f := dialog.NewForm(
 					"Net Config",
 					"Save", "Cancel",
-					makeNetConfigFormItems(v.nodeList.Text, &v.state.Detail),
+					makeNetConfigFormItems(v.nodeList.Text, detail),
 					func(b bool) {},
 					w)
 				f.Resize(fyne.NewSize(350, 500))
@@ -120,25 +119,13 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 	v.searchBtn = widget.NewButtonWithIcon("", theme.SearchIcon(), func() {
 		popup := showProgressing(w, "Searching, please wait...", 400)
 		go func() {
-			netInfo, ok := v.state.NodeNet[v.nodeList.Text]
-			if !ok {
-				netInfo = state.NetInfo{}
-			}
-			err := netInfo.LoadLnetCtlInfo()
-			if err != nil {
-				logger.Errorf("load lnetctl info failed, %v\n", err)
-			} else {
-				err = netInfo.LoadLinkInfo()
-				if err != nil {
-					logger.Errorf("load link info failed, %v\n", err)
-				}
-			}
-			v.state.NodeNet[v.nodeList.Text] = netInfo
+			conn := v.state.SSHCon[v.nodeList.Text]
+			err := v.state.LoadInterfaceDetail(conn.IPAddress, conn.User, conn.Password)
 			fyne.Do(func() {
 				if popup != nil {
 					popup.Hide()
 				}
-				if ok && err != nil {
+				if err != nil {
 					// draw error dialog
 					errLabel := widget.NewLabel(err.Error())
 					errLabel.Wrapping = fyne.TextWrapWord
