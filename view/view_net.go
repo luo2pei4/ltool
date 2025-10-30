@@ -3,7 +3,6 @@ package view
 import (
 	"image/color"
 	"strconv"
-	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -96,23 +95,21 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 			linkTypeLabel := recordArea.Objects[3].(*widget.Label)
 			stateLabel := recordArea.Objects[4].(*widget.Label)
 			lnetLabel := recordArea.Objects[5].(*widget.Label)
-			netInfo, lnetMap := v.state.GetNetInterfaceRecord(v.nodeList.Text, id)
-			if netInfo != nil {
-				adapterLabel.SetText(netInfo.Name)
-				ipLabel.SetText(netInfo.IPv4)
-				macLabel.SetText(netInfo.MAC)
-				linkTypeLabel.SetText(netInfo.LinkType)
-				stateLabel.SetText(netInfo.State)
-				if nid, ok := lnetMap[netInfo.Name]; ok {
-					lnetLabel.SetText(nid)
-				}
-			}
+			v.state.LoadInterfaceDetail(v.nodeList.Text, id)
+
+			adapterLabel.SetText(v.state.Detail.Name)
+			ipLabel.SetText(v.state.Detail.IPv4)
+			macLabel.SetText(v.state.Detail.MAC)
+			linkTypeLabel.SetText(v.state.Detail.LinkType)
+			stateLabel.SetText(v.state.Detail.State)
+			lnetLabel.SetText(v.state.Detail.NID)
+
 			editBtn := row.Objects[1].(*widget.Button)
 			editBtn.OnTapped = func() {
 				f := dialog.NewForm(
 					"Net Config",
 					"Save", "Cancel",
-					makeNetConfigFormItems(v.nodeList.Text, netInfo, lnetMap),
+					makeNetConfigFormItems(v.nodeList.Text, &v.state.Detail),
 					func(b bool) {},
 					w)
 				f.Resize(fyne.NewSize(350, 500))
@@ -171,40 +168,25 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 	return content
 }
 
-func makeNetConfigFormItems(manageIP string, netInfo *state.NetInterface, lnetMap map[string]string) []*widget.FormItem {
+func makeNetConfigFormItems(manageIP string, detail *state.NetDetail) []*widget.FormItem {
+
 	items := make([]*widget.FormItem, 0)
-	items = append(items, widget.NewFormItem("Interface", widget.NewLabel(netInfo.Name)))
-	items = append(items, widget.NewFormItem("Alt names", widget.NewLabel(strings.Join(netInfo.AltNames, ","))))
-	if netInfo.IPv4 == manageIP {
+	items = append(items, widget.NewFormItem("Interface", widget.NewLabel(detail.Name)))
+	items = append(items, widget.NewFormItem("Alt names", widget.NewLabel(detail.AltNames)))
+	if detail.IPv4 == manageIP {
 		items = append(items, widget.NewFormItem("IP address", widget.NewLabel(manageIP)))
 	} else {
-		items = append(items, widget.NewFormItem("IP address", &widget.Entry{Text: netInfo.IPv4, MultiLine: false}))
+		items = append(items, widget.NewFormItem("IP address", &widget.Entry{Text: detail.IPv4, MultiLine: false}))
 	}
-	items = append(items, widget.NewFormItem("Mac address", widget.NewLabel(netInfo.MAC)))
-	items = append(items, widget.NewFormItem("State", widget.NewLabel(netInfo.State)))
-	items = append(items, widget.NewFormItem("Flags", widget.NewLabel(strings.Join(netInfo.Flags, ","))))
-	items = append(items, widget.NewFormItem("MTU", widget.NewLabel(strconv.Itoa(netInfo.MTU))))
-	nid := lnetMap[netInfo.Name]
-	var (
-		ip      string
-		netType string
-		idx     string
-	)
-	if len(nid) != 0 {
-		arr := strings.Split(nid, "@")
-		ip = arr[0]
-		if strings.HasPrefix(arr[1], "tcp") {
-			netType = "tcp"
-			idx = strings.TrimPrefix(arr[1], "tcp")
-		} else if strings.HasPrefix(arr[1], "o2ib") {
-			netType = "o2ib"
-			idx = strings.TrimPrefix(arr[1], "o2ib")
-		}
-	}
-	ipEntry := widget.Entry{Text: ip, MultiLine: false}
-	idxEntry := widget.Entry{Text: idx, MultiLine: false}
+	items = append(items, widget.NewFormItem("Mac address", widget.NewLabel(detail.MAC)))
+	items = append(items, widget.NewFormItem("State", widget.NewLabel(detail.State)))
+	items = append(items, widget.NewFormItem("Flags", widget.NewLabel(detail.Flags)))
+	items = append(items, widget.NewFormItem("MTU", widget.NewLabel(strconv.Itoa(detail.MTU))))
+
+	ipEntry := widget.Entry{Text: detail.NIDIP, MultiLine: false}
+	idxEntry := widget.Entry{Text: detail.SuffixIdx, MultiLine: false}
 	ntSelect := widget.NewSelectEntry([]string{"tcp", "o2ib"})
-	ntSelect.Text = netType
+	ntSelect.Text = detail.NetType
 	nidArea := container.New(&layout.NIDAreaGrid{}, &ipEntry, ntSelect, &idxEntry)
 	items = append(items, widget.NewFormItem("NID", nidArea))
 	return items

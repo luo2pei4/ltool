@@ -43,6 +43,23 @@ type NetInterface struct {
 	IPv6     string
 }
 
+type NetDetail struct {
+	Name      string
+	IfAlias   string
+	Flags     string
+	State     string
+	MAC       string
+	MTU       int
+	LinkType  string
+	AltNames  string
+	IPv4      string
+	IPv6      string
+	NID       string
+	NIDIP     string
+	NetType   string
+	SuffixIdx string
+}
+
 type NetInfo struct {
 	Conn             SSHConnection
 	LnetCtl          LnetCtl
@@ -53,6 +70,7 @@ type NetState struct {
 	sync.RWMutex
 	NodeList []string
 	NodeNet  map[string]NetInfo
+	Detail   NetDetail
 }
 
 func (n *NetState) LoadNodeList() error {
@@ -251,13 +269,12 @@ func (n *NetInfo) LoadLinkInfo() error {
 	return nil
 }
 
-func (n *NetState) GetNetInterfaceRecord(nodeIP string, id int) (*NetInterface, map[string]string) {
+func (n *NetState) LoadInterfaceDetail(nodeIP string, id int) {
+
 	n.RLock()
 	defer n.RUnlock()
-	nodeNet, ok := n.NodeNet[nodeIP]
-	if !ok {
-		return nil, nil
-	}
+
+	nodeNet := n.NodeNet[nodeIP]
 	interfaceList := make([]*NetInterface, 0, len(nodeNet.NetInterfacesMap))
 	for _, info := range nodeNet.NetInterfacesMap {
 		interfaceList = append(interfaceList, &info)
@@ -266,19 +283,50 @@ func (n *NetState) GetNetInterfaceRecord(nodeIP string, id int) (*NetInterface, 
 		return interfaceList[i].Name < interfaceList[j].Name
 	})
 
+	n.Detail.Name = interfaceList[id].Name
+	n.Detail.IfAlias = interfaceList[id].IfAlias
+	n.Detail.Flags = strings.Join(interfaceList[id].Flags, ",")
+	n.Detail.State = interfaceList[id].State
+	n.Detail.MAC = interfaceList[id].MAC
+	n.Detail.MTU = interfaceList[id].MTU
+	n.Detail.LinkType = interfaceList[id].LinkType
+	n.Detail.AltNames = strings.Join(interfaceList[id].AltNames, ",")
+	n.Detail.IPv4 = interfaceList[id].IPv4
+	n.Detail.IPv6 = interfaceList[id].IPv6
+
 	if len(nodeNet.LnetCtl.Net) == 0 {
-		return interfaceList[id], nil
+		return
 	}
 
-	// lnet info
-	lnetMap := make(map[string]string) // key: interface name, value: nid
+	name := interfaceList[id].Name
+	nid := ""
 	for _, net := range nodeNet.LnetCtl.Net {
 		for _, ni := range net.LocalNIs {
 			for _, iname := range ni.Interfaces {
-				lnetMap[iname] = ni.NID
+				if iname == name {
+					nid = ni.NID
+				}
 			}
 		}
 	}
-
-	return interfaceList[id], lnetMap
+	n.Detail.NID = nid
+	if len(nid) != 0 {
+		arr := strings.Split(nid, "@")
+		netType := ""
+		idx := ""
+		if strings.HasPrefix(arr[1], "tcp") {
+			netType = "tcp"
+			idx = strings.TrimPrefix(arr[1], "tcp")
+		} else if strings.HasPrefix(arr[1], "o2ib") {
+			netType = "o2ib"
+			idx = strings.TrimPrefix(arr[1], "o2ib")
+		}
+		n.Detail.NIDIP = arr[0]
+		n.Detail.NetType = netType
+		n.Detail.SuffixIdx = idx
+	} else {
+		n.Detail.NIDIP = ""
+		n.Detail.NetType = ""
+		n.Detail.SuffixIdx = ""
+	}
 }
