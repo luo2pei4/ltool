@@ -162,6 +162,9 @@ func (v *NetMainUI) showDetailDialog(w fyne.Window, id int) {
 	if detail.IPv4 == manageIP {
 		items = append(items, widget.NewFormItem("IPv4", widget.NewLabel(manageIP+"/"+strconv.Itoa(detail.Mask))))
 	} else {
+		if detail.Mask == 0 {
+			detail.Mask = 24
+		}
 		maskSelect.Text = strconv.Itoa(detail.Mask)
 		ipArea := container.New(&layout.IPAddressAreaGrid{}, ipEntry, maskSelect)
 		items = append(items, widget.NewFormItem("IPv4", ipArea))
