@@ -1,7 +1,6 @@
 package view
 
 import (
-	"fmt"
 	"image/color"
 	"strconv"
 
@@ -106,7 +105,7 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 
 			editBtn := row.Objects[1].(*widget.Button)
 			editBtn.OnTapped = func() {
-				showDetailDialog(w, v.nodeList, &v.state.Details[id])
+				v.showDetailDialog(w, id)
 			}
 		},
 	)
@@ -149,20 +148,27 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 	return content
 }
 
-func showDetailDialog(w fyne.Window, nodeList *widget.SelectEntry, detail *state.NetDetail) {
+func (v *NetMainUI) showDetailDialog(w fyne.Window, id int) {
 
-	manageIP := nodeList.Text
+	manageIP := v.nodeList.Text
+	detail := &v.state.Details[id]
+
 	items := make([]*widget.FormItem, 0)
 	items = append(items, widget.NewFormItem("Interface", widget.NewLabel(detail.Name)))
 	items = append(items, widget.NewFormItem("Alt names", widget.NewLabel(detail.AltNames)))
 
 	ipEntry := &widget.Entry{Text: detail.IPv4, MultiLine: false}
+	maskSelect := widget.NewSelectEntry([]string{"8", "16", "24", "32"})
 	if detail.IPv4 == manageIP {
-		items = append(items, widget.NewFormItem("IP address", widget.NewLabel(manageIP)))
+		items = append(items, widget.NewFormItem("IPv4", widget.NewLabel(manageIP+"/"+strconv.Itoa(detail.Mask))))
 	} else {
-		items = append(items, widget.NewFormItem("IP address", ipEntry))
+		maskSelect.Text = strconv.Itoa(detail.Mask)
+		ipArea := container.New(&layout.IPAddressAreaGrid{}, ipEntry, maskSelect)
+		items = append(items, widget.NewFormItem("IPv4", ipArea))
 	}
-	items = append(items, widget.NewFormItem("Mac address", widget.NewLabel(detail.MAC)))
+	gwEntry := &widget.Entry{Text: detail.Gateway, MultiLine: false}
+	items = append(items, widget.NewFormItem("Gateway", gwEntry))
+	items = append(items, widget.NewFormItem("Mac", widget.NewLabel(detail.MAC)))
 	items = append(items, widget.NewFormItem("State", widget.NewLabel(detail.State)))
 	items = append(items, widget.NewFormItem("Flags", widget.NewLabel(detail.Flags)))
 	items = append(items, widget.NewFormItem("MTU", widget.NewLabel(strconv.Itoa(detail.MTU))))
@@ -180,10 +186,38 @@ func showDetailDialog(w fyne.Window, nodeList *widget.SelectEntry, detail *state
 		items,
 		func(ok bool) {
 			if ok {
-				fmt.Printf("ipEntry: %s\n", ipEntry.Text)
-				fmt.Printf("nidIPEntry: %s\n", nidIPEntry.Text)
-				fmt.Printf("net type: %s\n", ntSelect.Text)
-				fmt.Printf("idxEntry: %s\n", idxEntry.Text)
+				switch detail.IPv4 {
+				case manageIP:
+					detail.IPv4 = ipEntry.Text
+					detail.Mask, _ = strconv.Atoi(maskSelect.Text)
+					detail.Gateway = gwEntry.Text
+					popup := showProgressing(w, "Saving, please wait...", 400)
+					go func() {
+						conn := v.state.SSHCon[manageIP]
+						err := detail.SetIPv4(conn.IPAddress, conn.User, conn.Password)
+						if err == nil {
+							err = v.state.LoadInterfaceDetail(conn.IPAddress, conn.User, conn.Password)
+						}
+						fyne.Do(func() {
+							if popup != nil {
+								popup.Hide()
+							}
+							if err != nil {
+								// draw error dialog
+								errLabel := widget.NewLabel(err.Error())
+								errLabel.Wrapping = fyne.TextWrapWord
+								bg := canvas.NewRectangle(color.NRGBA{0, 0, 0, 0})
+								bg.SetMinSize(fyne.NewSize(400, 160))
+								content := container.NewStack(bg, container.NewVBox(errLabel))
+								dialog.ShowCustom("Error", "Close", content, w)
+								return
+							}
+							v.header.Show()
+							v.records.Refresh()
+						})
+					}()
+				default:
+				}
 			}
 		}, w,
 	)

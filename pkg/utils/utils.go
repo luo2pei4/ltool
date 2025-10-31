@@ -87,3 +87,10 @@ func RemoteCmd(host, user, password, cmd string) ([]byte, error) {
 	}
 	return output, nil
 }
+
+func AssembleCmd(args ...string) string {
+	if len(args) == 0 {
+		return ""
+	}
+	return strings.Join(args, " ")
+}

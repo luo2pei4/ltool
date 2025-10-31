@@ -2,6 +2,7 @@ package state
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"sort"
 	"strconv"
@@ -9,7 +10,9 @@ import (
 	"sync"
 
 	"github.com/luo2pei4/ltool/pkg/dblayer"
+	logger "github.com/luo2pei4/ltool/pkg/log"
 	"github.com/luo2pei4/ltool/pkg/utils"
+	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v3"
 	"gorm.io/gorm"
 )
@@ -41,6 +44,8 @@ type NetInterface struct {
 	AltNames []string
 	IPv4     string
 	IPv6     string
+	Mask     int
+	Gateway  string
 }
 
 type NetDetail struct {
@@ -58,6 +63,8 @@ type NetDetail struct {
 	NIDIP     string
 	NetType   string
 	SuffixIdx string
+	Mask      int
+	Gateway   string
 }
 
 type NetInfo struct {
@@ -226,13 +233,20 @@ func loadLinkInfo(ip, user, pwd string) (map[string]NetInterface, error) {
 		// fields[1]: adapter name，example "eth0"
 		// fields[2]: protocal，"inet" or "inet6"
 		// fields[3]: IP/mask，exampl "192.168.1.100/24" or "fe80::1/64"
+		// fields[4]: brd
+		// fields[5]: 192.168.50.255
 
 		ifName := fields[1]
 		family := fields[2]
 		ipWithMask := fields[3]
 
 		// split IP and mask
-		ip := strings.Split(ipWithMask, "/")[0]
+		arr := strings.Split(ipWithMask, "/")
+		ip := arr[0]
+		mask := 24
+		if len(arr) == 2 {
+			mask, _ = strconv.Atoi(arr[1])
+		}
 
 		// filt loopback and invalid address
 		if ifName == "lo" {
@@ -245,6 +259,10 @@ func loadLinkInfo(ip, user, pwd string) (map[string]NetInterface, error) {
 		iinfo, ok := interfaces[ifName]
 		if !ok {
 			continue
+		}
+		iinfo.Mask = mask
+		if fields[4] == "brd" {
+			iinfo.Gateway = fields[5]
 		}
 
 		if family == "inet" {
@@ -284,6 +302,8 @@ func (n *NetState) LoadInterfaceDetail(ip, user, pwd string) error {
 			AltNames: strings.Join(info.AltNames, ","),
 			IPv4:     info.IPv4,
 			IPv6:     info.IPv6,
+			Mask:     info.Mask,
+			Gateway:  info.Gateway,
 		})
 	}
 	sort.SliceStable(details, func(i, j int) bool {
@@ -328,5 +348,51 @@ func (n *NetState) LoadInterfaceDetail(ip, user, pwd string) error {
 		details[i].SuffixIdx = idx
 	}
 	n.Details = details
+	return nil
+}
+
+func (n *NetDetail) SetIPv4(ip, user, pwd string) error {
+	// check command exist
+	if _, err := utils.RemoteCmd(ip, user, pwd, "nmcli"); err != nil {
+		logger.Errorf("check cmd 'nmcli' error, %v", err)
+		return errors.New("unable to complete the operation, check whether the 'nmcli' command is installed")
+	}
+	// check interface exist
+	if _, err := utils.RemoteCmd(ip, user, pwd, "nmcli device show "+n.Name); err != nil {
+		logger.Errorf("find iface '%s' error, %v", n.Name, err)
+		return fmt.Errorf("find iface '%s' error: %v", n.Name, err)
+	}
+	cmd := utils.AssembleCmd("nmcli", "con", "show", n.Name)
+	if _, err := utils.RemoteCmd(ip, user, pwd, cmd); err != nil {
+		logger.Errorf("show iface error, %v", err)
+		if exitErr, ok := err.(*ssh.ExitError); ok {
+			if exitErr.ExitStatus() != 10 {
+				return err
+			}
+		}
+		cmd = utils.AssembleCmd("nmcli", "con", "add", "type", "ethernet", "ifname", n.Name, "con-name", n.Name)
+		if _, err := utils.RemoteCmd(ip, user, pwd, cmd); err != nil {
+			logger.Errorf("set ipv4 address error, %v", err)
+			return err
+		}
+	}
+	if len(n.Gateway) != 0 {
+		cmd = utils.AssembleCmd(
+			"nmcli", "con", "mod", n.Name, "ipv4.method", "manual",
+			"ipv4.addr", fmt.Sprintf("%s/%d", n.IPv4, n.Mask), "ipv4.gateway", n.Gateway,
+		)
+	} else {
+		cmd = utils.AssembleCmd(
+			"nmcli", "con", "mod", n.Name, "ipv4.method", "manual",
+			"ipv4.addr", fmt.Sprintf("%s/%d", n.IPv4, n.Mask))
+	}
+	if _, err := utils.RemoteCmd(ip, user, pwd, cmd); err != nil {
+		logger.Errorf("modify gateway error, %v", err)
+		return err
+	}
+	if _, err := utils.RemoteCmd(ip, user, pwd, "nmcli connection up "+n.Name); err != nil {
+		logger.Errorf("up connection error, %v", err)
+		return err
+	}
 	return nil
 }
