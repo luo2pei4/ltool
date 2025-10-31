@@ -1,6 +1,7 @@
 package view
 
 import (
+	"fmt"
 	"image/color"
 	"strconv"
 
@@ -105,14 +106,7 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 
 			editBtn := row.Objects[1].(*widget.Button)
 			editBtn.OnTapped = func() {
-				f := dialog.NewForm(
-					"Net Config",
-					"Save", "Cancel",
-					makeNetConfigFormItems(v.nodeList.Text, detail),
-					func(b bool) {},
-					w)
-				f.Resize(fyne.NewSize(350, 500))
-				f.Show()
+				showDetailDialog(w, v.nodeList, &v.state.Details[id])
 			}
 		},
 	)
@@ -155,26 +149,44 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 	return content
 }
 
-func makeNetConfigFormItems(manageIP string, detail *state.NetDetail) []*widget.FormItem {
+func showDetailDialog(w fyne.Window, nodeList *widget.SelectEntry, detail *state.NetDetail) {
 
+	manageIP := nodeList.Text
 	items := make([]*widget.FormItem, 0)
 	items = append(items, widget.NewFormItem("Interface", widget.NewLabel(detail.Name)))
 	items = append(items, widget.NewFormItem("Alt names", widget.NewLabel(detail.AltNames)))
+
+	ipEntry := &widget.Entry{Text: detail.IPv4, MultiLine: false}
 	if detail.IPv4 == manageIP {
 		items = append(items, widget.NewFormItem("IP address", widget.NewLabel(manageIP)))
 	} else {
-		items = append(items, widget.NewFormItem("IP address", &widget.Entry{Text: detail.IPv4, MultiLine: false}))
+		items = append(items, widget.NewFormItem("IP address", ipEntry))
 	}
 	items = append(items, widget.NewFormItem("Mac address", widget.NewLabel(detail.MAC)))
 	items = append(items, widget.NewFormItem("State", widget.NewLabel(detail.State)))
 	items = append(items, widget.NewFormItem("Flags", widget.NewLabel(detail.Flags)))
 	items = append(items, widget.NewFormItem("MTU", widget.NewLabel(strconv.Itoa(detail.MTU))))
 
-	ipEntry := widget.Entry{Text: detail.NIDIP, MultiLine: false}
-	idxEntry := widget.Entry{Text: detail.SuffixIdx, MultiLine: false}
+	nidIPEntry := &widget.Entry{Text: detail.NIDIP, MultiLine: false}
+	idxEntry := &widget.Entry{Text: detail.SuffixIdx, MultiLine: false}
 	ntSelect := widget.NewSelectEntry([]string{"tcp", "o2ib"})
 	ntSelect.Text = detail.NetType
-	nidArea := container.New(&layout.NIDAreaGrid{}, &ipEntry, ntSelect, &idxEntry)
+	nidArea := container.New(&layout.NIDAreaGrid{}, nidIPEntry, ntSelect, idxEntry)
 	items = append(items, widget.NewFormItem("NID", nidArea))
-	return items
+
+	f := dialog.NewForm(
+		"Net Config",
+		"Save", "Cancel",
+		items,
+		func(ok bool) {
+			if ok {
+				fmt.Printf("ipEntry: %s\n", ipEntry.Text)
+				fmt.Printf("nidIPEntry: %s\n", nidIPEntry.Text)
+				fmt.Printf("net type: %s\n", ntSelect.Text)
+				fmt.Printf("idxEntry: %s\n", idxEntry.Text)
+			}
+		}, w,
+	)
+	f.Resize(fyne.NewSize(350, 500))
+	f.Show()
 }
