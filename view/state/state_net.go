@@ -80,6 +80,13 @@ type NetState struct {
 	Details  []NetDetail
 }
 
+var IPv4MaskCIDRList = []string{
+	"0", "1", "2", "3", "4", "5", "6", "7",
+	"8", "9", "10", "11", "12", "13", "14", "15",
+	"16", "17", "18", "19", "20", "21", "22", "23",
+	"24", "25", "26", "27", "28", "29", "30", "31", "32",
+}
+
 func (n *NetState) LoadNodeList() error {
 	repoNodes, err := dblayer.DB.ListNodes("")
 	if err != nil {
@@ -376,18 +383,13 @@ func (n *NetDetail) SetIPv4(ip, user, pwd string) error {
 			return err
 		}
 	}
+	cmdItems := []string{"nmcli", "con", "mod", n.Name, "ipv4.method", "manual", "ipv4.addr", fmt.Sprintf("%s/%d", n.IPv4, n.Mask)}
 	if len(n.Gateway) != 0 {
-		cmd = utils.AssembleCmd(
-			"nmcli", "con", "mod", n.Name, "ipv4.method", "manual",
-			"ipv4.addr", fmt.Sprintf("%s/%d", n.IPv4, n.Mask), "ipv4.gateway", n.Gateway,
-		)
-	} else {
-		cmd = utils.AssembleCmd(
-			"nmcli", "con", "mod", n.Name, "ipv4.method", "manual",
-			"ipv4.addr", fmt.Sprintf("%s/%d", n.IPv4, n.Mask))
+		cmdItems = append(cmdItems, "ipv4.gateway", n.Gateway)
 	}
+	cmd = utils.AssembleCmd(cmdItems...)
 	if _, err := utils.RemoteCmd(ip, user, pwd, cmd); err != nil {
-		logger.Errorf("modify gateway error, %v", err)
+		logger.Errorf("modify ipv4 address error, cmd: %s, %v", cmd, err)
 		return err
 	}
 	if _, err := utils.RemoteCmd(ip, user, pwd, "nmcli connection up "+n.Name); err != nil {
