@@ -3,6 +3,7 @@ package view
 import (
 	"image/color"
 	"strconv"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -17,7 +18,7 @@ import (
 
 type NetMainUI struct {
 	state     *state.NetState
-	nodeList  *widget.SelectEntry
+	nodeList  *widget.SelectEntry // management ip address list
 	searchBtn *widget.Button
 	header    *fyne.Container
 	records   *widget.List
@@ -150,7 +151,7 @@ func (v *NetMainUI) CreateView(w fyne.Window) fyne.CanvasObject {
 
 func (v *NetMainUI) showDetailDialog(w fyne.Window, id int) {
 
-	manageIP := v.nodeList.Text
+	managementIP := v.nodeList.Text
 	detail := &v.state.Details[id]
 
 	items := make([]*widget.FormItem, 0)
@@ -158,13 +159,10 @@ func (v *NetMainUI) showDetailDialog(w fyne.Window, id int) {
 	items = append(items, widget.NewFormItem("Alt names", widget.NewLabel(detail.AltNames)))
 
 	ipEntry := &widget.Entry{Text: detail.IPv4, MultiLine: false}
-	maskSelect := widget.NewSelectEntry([]string{"8", "16", "24", "32"})
-	if detail.IPv4 == manageIP {
-		items = append(items, widget.NewFormItem("IPv4", widget.NewLabel(manageIP+"/"+strconv.Itoa(detail.Mask))))
+	maskSelect := widget.NewSelectEntry(state.IPv4MaskCIDRList)
+	if detail.IPv4 == managementIP {
+		items = append(items, widget.NewFormItem("IPv4", widget.NewLabel(managementIP+"/"+strconv.Itoa(detail.Mask))))
 	} else {
-		if detail.Mask == 0 {
-			detail.Mask = 24
-		}
 		maskSelect.Text = strconv.Itoa(detail.Mask)
 		ipArea := container.New(&layout.IPAddressAreaGrid{}, ipEntry, maskSelect)
 		items = append(items, widget.NewFormItem("IPv4", ipArea))
@@ -189,38 +187,43 @@ func (v *NetMainUI) showDetailDialog(w fyne.Window, id int) {
 		items,
 		func(ok bool) {
 			if ok {
-				switch detail.IPv4 {
-				case manageIP:
+				isManagementInterface := detail.IPv4 == managementIP
+				if isManagementInterface {
+					return
+				}
+				if strings.TrimSpace(ipEntry.Text) == "" && detail.IPv4 != "" {
+					return
+				} else {
 					detail.IPv4 = ipEntry.Text
 					detail.Mask, _ = strconv.Atoi(maskSelect.Text)
 					detail.Gateway = gwEntry.Text
-					popup := showProgressing(w, "Saving, please wait...", 400)
-					go func() {
-						conn := v.state.SSHCon[manageIP]
-						err := detail.SetIPv4(conn.IPAddress, conn.User, conn.Password)
-						if err == nil {
-							err = v.state.LoadInterfaceDetail(conn.IPAddress, conn.User, conn.Password)
-						}
-						fyne.Do(func() {
-							if popup != nil {
-								popup.Hide()
-							}
-							if err != nil {
-								// draw error dialog
-								errLabel := widget.NewLabel(err.Error())
-								errLabel.Wrapping = fyne.TextWrapWord
-								bg := canvas.NewRectangle(color.NRGBA{0, 0, 0, 0})
-								bg.SetMinSize(fyne.NewSize(400, 160))
-								content := container.NewStack(bg, container.NewVBox(errLabel))
-								dialog.ShowCustom("Error", "Close", content, w)
-								return
-							}
-							v.header.Show()
-							v.records.Refresh()
-						})
-					}()
-				default:
 				}
+
+				popup := showProgressing(w, "Saving, please wait...", 400)
+				go func() {
+					conn := v.state.SSHCon[managementIP]
+					err := detail.SetIPv4(conn.IPAddress, conn.User, conn.Password)
+					if err == nil {
+						err = v.state.LoadInterfaceDetail(conn.IPAddress, conn.User, conn.Password)
+					}
+					fyne.Do(func() {
+						if popup != nil {
+							popup.Hide()
+						}
+						if err != nil {
+							// draw error dialog
+							errLabel := widget.NewLabel(err.Error())
+							errLabel.Wrapping = fyne.TextWrapWord
+							bg := canvas.NewRectangle(color.NRGBA{0, 0, 0, 0})
+							bg.SetMinSize(fyne.NewSize(400, 160))
+							content := container.NewStack(bg, container.NewVBox(errLabel))
+							dialog.ShowCustom("Error", "Close", content, w)
+							return
+						}
+						v.header.Show()
+						v.records.Refresh()
+					})
+				}()
 			}
 		}, w,
 	)
