@@ -192,6 +192,32 @@ func (v *NetMainUI) showDetailDialog(w fyne.Window, id int) {
 					return
 				}
 				if strings.TrimSpace(ipEntry.Text) == "" && detail.IPv4 != "" {
+					// delete ipv4 address
+					popup := showProgressing(w, "Saving, please wait...", 400)
+					go func() {
+						conn := v.state.SSHCon[managementIP]
+						err := detail.DeleteIPv4(conn.IPAddress, conn.User, conn.Password)
+						if err == nil {
+							err = v.state.LoadInterfaceDetail(conn.IPAddress, conn.User, conn.Password)
+						}
+						fyne.Do(func() {
+							if popup != nil {
+								popup.Hide()
+							}
+							if err != nil {
+								// draw error dialog
+								errLabel := widget.NewLabel(err.Error())
+								errLabel.Wrapping = fyne.TextWrapWord
+								bg := canvas.NewRectangle(color.NRGBA{0, 0, 0, 0})
+								bg.SetMinSize(fyne.NewSize(400, 160))
+								content := container.NewStack(bg, container.NewVBox(errLabel))
+								dialog.ShowCustom("Error", "Close", content, w)
+								return
+							}
+							v.header.Show()
+							v.records.Refresh()
+						})
+					}()
 					return
 				} else {
 					detail.IPv4 = ipEntry.Text

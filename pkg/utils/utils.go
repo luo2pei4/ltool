@@ -83,7 +83,7 @@ func RemoteCmd(host, user, password, cmd string) ([]byte, error) {
 	defer session.Close()
 	output, err := session.CombinedOutput(cmd)
 	if err != nil {
-		return nil, fmt.Errorf("execute command failed, %v", err)
+		return nil, fmt.Errorf("execute command failed, %w", err)
 	}
 	return output, nil
 }
