@@ -398,3 +398,41 @@ func (n *NetDetail) SetIPv4(ip, user, pwd string) error {
 	}
 	return nil
 }
+
+func (n *NetDetail) DeleteIPv4(ip, user, pwd string) error {
+	// check command exist
+	if _, err := utils.RemoteCmd(ip, user, pwd, "nmcli"); err != nil {
+		logger.Errorf("check cmd 'nmcli' error, %v", err)
+		return errors.New("unable to complete the operation, check whether the 'nmcli' command is installed")
+	}
+	// check interface exist
+	if _, err := utils.RemoteCmd(ip, user, pwd, "nmcli device show "+n.Name); err != nil {
+		logger.Errorf("find iface '%s' error, %v", n.Name, err)
+		return fmt.Errorf("find iface '%s' error: %v", n.Name, err)
+	}
+	cmd := utils.AssembleCmd("nmcli", "con", "show", n.Name)
+	if _, err := utils.RemoteCmd(ip, user, pwd, cmd); err != nil {
+		logger.Errorf("show iface error, %v", err)
+		// if connection not exist, return directly
+		return nil
+	}
+	// set ipv4.method to disabled to remove ip address
+	cmdItems := []string{"nmcli", "con", "mod", n.Name, "ipv4.method", "disabled", "ipv4.addr", "\"\"", "ipv4.gateway", "\"\""}
+	cmd = utils.AssembleCmd(cmdItems...)
+	if _, err := utils.RemoteCmd(ip, user, pwd, cmd); err != nil {
+		logger.Errorf("delete ipv4 address error, cmd: %s, %v", cmd, err)
+		return err
+	}
+	upConnCmd := "nmcli connection up " + n.Name
+	if _, err := utils.RemoteCmd(ip, user, pwd, upConnCmd); err != nil {
+		var exitErr *ssh.ExitError
+		if errors.As(err, &exitErr) {
+			if exitErr.ExitStatus() == 4 {
+				return nil
+			}
+		}
+		logger.Errorf("up connection error, cmd: %s, %v", upConnCmd, err)
+		return err
+	}
+	return nil
+}
